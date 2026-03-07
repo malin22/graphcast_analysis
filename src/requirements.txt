@@ -1,6 +1,0 @@
-numpy
-xarray
-gcsfs
-netcdf4
-zarr
-fsspec
