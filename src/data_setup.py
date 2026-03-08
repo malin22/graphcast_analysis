@@ -112,5 +112,5 @@ if __name__ == "__main__":
 
     write_daily_era5_files(
         ds,
-        out_dir = '/home/student/m/mbraatz/graphcast_analysis/data/era5_daily_nc'
+        out_dir = '/share/prj-4d/graphcast_shared/data/era5_daily_nc'
     )
