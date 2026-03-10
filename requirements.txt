@@ -4,3 +4,17 @@ gcsfs
 netcdf4
 zarr
 fsspec
+
+#for graphcast:
+jax==0.4.38
+jaxlib==0.4.38
+dm-haiku==0.0.14
+dm-tree==0.1.9
+chex==0.1.90
+jmp==0.0.4
+jraph==0.0.6.dev0
+tree-math==0.2.1
+tensorstore==0.1.76
+dinosaur-dycore==1.2.1
+
+graphcast @ git+https://github.com/theodoremacmillan/graphcast.git@a64f7934a7ea58549f45279808d01c04ab5de106
