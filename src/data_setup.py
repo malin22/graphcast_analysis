@@ -2,9 +2,8 @@ import os
 import numpy as np
 import xarray as xr
 import gcsfs
-from google.cloud import storage
 
-#the variables graphcast expects as input
+# Variables GraphCast expects as input
 DEFAULT_VARS = [
     "geopotential",
     "specific_humidity",
@@ -23,39 +22,19 @@ DEFAULT_VARS = [
 ]
 
 
-def load_era5_into_memory(start: str, end: str, zarr_path: str = "gs://weatherbench2/datasets/era5/1959-2022-full_37-6h-0p25deg_derived.zarr", vars_keep=None,):
-    """
-    Load a slice of ERA5 data fully into memory.
+def open_era5(zarr_path = "gs://weatherbench2/datasets/era5/1959-2022-full_37-6h-0p25deg_derived.zarr",):
 
-    Parameters
-    ----------
-    start, end : str
-        Date range (YYYY-MM-DD)
-    zarr_path : str
-        GCS or local Zarr path
-    vars_keep : list[str] | None
-        Variables to keep (None = all)
 
-    Returns
-    -------
-    xarray.Dataset
-        Fully-loaded dataset in memory
-    """
-    if vars_keep is None:
-      vars_keep = DEFAULT_VARS
+    ds = xr.open_zarr(
+        zarr_path,
+        consolidated=True,
+        storage_options={
+        "token": "anon",
+        "session_kwargs": {"trust_env": True},
+        },
+    )
 
-    start = np.datetime64(start)
-    end = np.datetime64(end)
-
-    # --- Open Zarr store ---
-    if zarr_path.startswith("gs://"):
-        fs = gcsfs.GCSFileSystem(token="anon")
-        store = fs.get_mapper(zarr_path[5:])
-        ds = xr.open_zarr(store, consolidated=True)
-    else:
-        ds = xr.open_zarr(zarr_path, consolidated=True)
-
-    # --- Normalize coords ---
+    # Normalize coordinate names
     rename = {}
     if "latitude" in ds.coords:
         rename["latitude"] = "lat"
@@ -64,53 +43,77 @@ def load_era5_into_memory(start: str, end: str, zarr_path: str = "gs://weatherbe
     if rename:
         ds = ds.rename(rename)
 
+    # Ensure ascending latitude
     if ds.lat[0] > ds.lat[-1]:
         ds = ds.reindex(lat=ds.lat[::-1])
 
-    # --- Time slice ---
+    return ds
+
+
+def subset_era5(ds: xr.Dataset,start: str,end: str,vars_keep=None,):
+    """subsetting the data to only keep the timeframe and variables needed"""
+    if vars_keep is None:
+        vars_keep = DEFAULT_VARS
+
+    start = np.datetime64(start)
+    end = np.datetime64(end)
+
+    # Time subset
     ds = ds.sel(time=slice(start, end))
 
-    # --- Variable selection ---
-    if vars_keep is not None:
-        ds = ds[[v for v in vars_keep if v in ds.data_vars]]
+    # Variable subset
+    keep = [v for v in vars_keep if v in ds.data_vars]
+    ds = ds[keep]
+    print("subsetting data done")
 
-    # --- LOAD EVERYTHING INTO MEMORY ---
-    ds = ds.load()
 
     return ds
 
+
 def write_daily_era5_files(ds: xr.Dataset, out_dir: str):
     """
-    Write an in-memory ERA5 Dataset to daily NetCDF files
-    compatible with three_step_window().
-
-    Assumes:
-      - ds has a 'time' coordinate of type datetime64
-      - 6-hourly (or finer) resolution
+    Write one NetCDF file per day. Each day is computed/written separately.
     """
-
     os.makedirs(out_dir, exist_ok=True)
 
-    # Group by day
-    for day, ds_day in ds.groupby("time.date"):
-        day_str = np.datetime_as_string(np.datetime64(day), unit="D")
+    # Extract unique days from time coordinate
+    unique_days = np.unique(ds.time.dt.floor("D").values)
+
+    print("writing NetCDF files now..")
+    for day in unique_days:
+        day = np.datetime64(day, "D")
+        next_day = day + np.timedelta64(1, "D")
+        day_str = np.datetime_as_string(day, unit="D")
         out_path = os.path.join(out_dir, f"era5_{day_str}.nc")
 
-        # Preserve original encoding as much as possible
+        # Select one day only
+        ds_day = ds.sel(time=slice(day, next_day - np.timedelta64(1, "ns")))
+
+        # Skip empty selections
+        if ds_day.sizes.get("time", 0) == 0:
+            continue
+
+        # Trigger reading/writing only for this day
         ds_day.to_netcdf(out_path)
 
-        print(f"[WRITE] {out_path}")
-
+        print(f"WRITEN: {out_path}")
 
 
 if __name__ == "__main__":
-    #
-    ds = load_era5_into_memory(
+    ds = open_era5()
+
+    ds = subset_era5(
+        ds,
         start="2021-08-29",
-        end="2021-08-30"
+        end="2021-08-30",
+        vars_keep=DEFAULT_VARS,
     )
 
     write_daily_era5_files(
         ds,
-        out_dir = '/share/prj-4d/graphcast_shared/data/era5_daily_nc'
+        out_dir='/share/prj-4d/graphcast_shared/data/era5_daily_nc'
     )
+
+    ds.close()  # xarray supports explicit resource cleanup
+    print("All files written and ds closed")
+
