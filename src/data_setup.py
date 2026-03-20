@@ -105,7 +105,7 @@ if __name__ == "__main__":
     ds = subset_era5(
         ds,
         start="2021-08-29",
-        end="2021-08-30",
+        end="2021-09-01",
         vars_keep=DEFAULT_VARS,
     )
 
@@ -116,4 +116,3 @@ if __name__ == "__main__":
 
     ds.close()  # xarray supports explicit resource cleanup
     print("All files written and ds closed")
-

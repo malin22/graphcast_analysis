@@ -35,8 +35,6 @@ from graphcast import (
 from graphcast.deep_typed_graph_net import get_activation_manager
 from google.cloud import storage
 
-
-
 #Authenticate with google Cloud Storage (to Access Graphcast storage)
 gcs_client = storage.Client.create_anonymous_client()
 gcs_bucket = gcs_client.get_bucket("dm_graphcast")
@@ -48,8 +46,8 @@ os.makedirs(acts_dir, exist_ok=True)
 
 ### extracting time 00, 06, 12, 18
 centers = np.arange(
-    np.datetime64("2021-08-29T06"),
-    np.datetime64("2021-08-30T00"),
+    np.datetime64("2021-08-30T06"), # produces nodes for time 06, 12, 18
+    np.datetime64("2021-08-31T00"),
     np.timedelta64(6, "h"),
 )
 
@@ -96,8 +94,9 @@ def three_step_window(data_dir: str, center_time: str) -> xr.Dataset | None:
 
     target_times = np.array([t_minus, t0, t_plus], dtype=ds.time.dtype)
     if not all(t in ds.time.values for t in target_times):
+        print(f"Missing needed times for center {center_time}: expected {target_times}, got {ds.time.values}")
         return None
-
+    
     ds = ds.sel(time=target_times)
 
     ds_new = ds.copy()
@@ -127,7 +126,6 @@ def three_step_window(data_dir: str, center_time: str) -> xr.Dataset | None:
 # ============================================================
 # LOAD GRAPHCAST + STATS — *EXACTLY YOUR CODE*
 # ============================================================
-print("here")
 gcs = storage.Client.create_anonymous_client()
 print("gcs set")
 bucket = gcs.get_bucket("dm_graphcast")
