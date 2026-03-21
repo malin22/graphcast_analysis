@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 from graphcast import icosahedral_mesh
 
@@ -145,6 +146,8 @@ def main():
 
     #plot_top_feature_deltas(delta, top_idx)
 
+    out_dir = "plots"
+    os.makedirs(out_dir, exist_ok=True)
 
     A = load_activations(ACTS_PATH)
     vertices, idx_by_level_cum, idx_by_level_only = mesh_hierarchy_indices(splits=6)
@@ -157,11 +160,11 @@ def main():
     for feature_idx in top_idx[:3]:
         plot_feature_across_levels(
             A, lat, lon, idx_by_level_cum, int(feature_idx),
-            mode_name="cumulative", out_name=f"feature_{feature_idx}_levels_cumulative.png"
+            mode_name="cumulative", out_name=f"{out_dir}/feature_{feature_idx}_levels_cumulative.png"
         )
         plot_feature_across_levels(
             A, lat, lon, idx_by_level_only, int(feature_idx),
-            mode_name="only-new-nodes", out_name=f"feature_{feature_idx}_levels_only.png"
+            mode_name="only-new-nodes", out_name=f"{out_dir}/feature_{feature_idx}_levels_only.png"
         )
         
 
