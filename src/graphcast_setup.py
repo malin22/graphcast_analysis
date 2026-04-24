@@ -46,8 +46,8 @@ os.makedirs(acts_dir, exist_ok=True)
 
 ### extracting time 00, 06, 12, 18
 centers = np.arange(
-    np.datetime64("2021-08-30T06"), # produces nodes for time 06, 12, 18
-    np.datetime64("2021-08-31T00"),
+    np.datetime64("2021-01-29T06"), # produces nodes for time 06, 12, 18
+    np.datetime64("2021-01-29T12"),
     np.timedelta64(6, "h"),
 )
 
