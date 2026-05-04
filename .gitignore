@@ -1,7 +1,6 @@
 data/
 data_venv/
-plots/
 logs/
 .vscode/
 
-*png
+*code-workspace
