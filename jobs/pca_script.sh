@@ -15,8 +15,9 @@ echo "Start time: $(date)"
 cd "$SLURM_SUBMIT_DIR"
 echo "Working directory: $(pwd)"
 
-source ~/.bashrc
+source /home/student/s/sascholle/miniconda3/etc/profile.d/conda.sh
 conda activate graphcast312
+
 srun python /home/student/s/sascholle/share/graphcast_analysis/src/pca_script.py
 
 echo "Finished at: $(date)"
