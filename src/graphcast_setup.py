@@ -41,13 +41,15 @@ gcs_bucket = gcs_client.get_bucket("dm_graphcast")
 dir_prefix = "graphcast/"
 
 data_dir = '/share/prj-4d/graphcast_shared/data/era5_daily_nc'        # contains era5_YYYY-MM-DD.nc
-acts_dir = '/share/prj-4d/graphcast_shared/data/graphcast_activation'
+acts_dir = '/share/prj-4d/graphcast_shared/data/graphcast_activation_2021'
 os.makedirs(acts_dir, exist_ok=True)
 
+
+# done: 01, 
 ### extracting time 00, 06, 12, 18
 centers = np.arange(
-    np.datetime64("2021-01-29T06"), # produces nodes for time 06, 12, 18
-    np.datetime64("2021-01-29T12"),
+    np.datetime64("2021-02-01T00"), # produces nodes for time 06, 12, 18
+    np.datetime64("2021-03-01T00"), # exclusive
     np.timedelta64(6, "h"),
 )
 
@@ -226,6 +228,15 @@ t_start = time.time()
 for center in centers:
     center_str = np.datetime_as_string(center, unit="h")
     print(f"[TIME] {center_str}")
+
+    act_path = os.path.join(
+        acts_dir,
+        f"layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t{center_str}.npy"
+    )
+
+    if os.path.exists(act_path):
+        print(f"[SKIP existing activation] {center_str}")
+        continue
 
     am.set_time(center_str)
 

@@ -70,9 +70,9 @@ def write_daily_era5_files(ds: xr.Dataset, start: str, end: str, out_dir: str):
         day_str = str(day.date())
         out_path = os.path.join(out_dir, f"era5_{day_str}.nc")
 
-        if os.path.exists(out_path):
-            print(f"Skipping existing file: {out_path}")
-            continue
+        #if os.path.exists(out_path):
+        #    print(f"Skipping existing file: {out_path}")
+        #    continue
 
         ds_day = ds.sel(time=slice(day64, next_day64 - np.timedelta64(1, "ns")))
 
@@ -97,8 +97,8 @@ if __name__ == "__main__":
 
     write_daily_era5_files(
         ds,
-        start="2021-01-01",
-        end="2021-12-31",
+        start="2021-11-01",
+        end="2021-11-30",
         out_dir="/share/prj-4d/graphcast_shared/data/era5_daily_nc",
     )
 
