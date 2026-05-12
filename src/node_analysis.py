@@ -2,6 +2,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 from graphcast import icosahedral_mesh
+from glob import glob
 
 ACTS_PATH = "/share/prj-4d/graphcast_shared/data/graphcast_activation/layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t2021-08-29T06.npy"
 
@@ -80,7 +81,6 @@ def summarize_groups(A: np.ndarray, idx_m0: np.ndarray, idx_m6_only: np.ndarray)
 
     return delta, top_idx
 
-
 # plotting functions to visualize feature differences across the mesh levels
 def plot_top_feature_deltas(delta: np.ndarray, top_idx: np.ndarray):
     plt.figure(figsize=(10, 4))
@@ -141,31 +141,89 @@ def plot_feature_across_levels(
     fig.suptitle(f"Feature {feature_idx} across mesh levels (mode: {mode_name})", fontsize=14)
     fig.savefig(out_name, dpi=300, bbox_inches="tight")
 
+def save_m5_node_activations(
+    acts_dir: str = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2021",
+    out_path: str = "/share/prj-4d/graphcast_shared/data/m5_node_activations_2021.npy",
+    splits: int = 6,
+    level: int = 5,
+):
+    """
+    Save activations for cumulative mesh level 5 (M5) nodes across all timesteps.
+
+    Output shape:
+        [node, timestamp, feature]
+    """
+    npy_files = sorted(glob(os.path.join(acts_dir, "*.npy")))
+    if not npy_files:
+        raise FileNotFoundError(f"No .npy files found in {acts_dir}")
+
+    _, idx_by_level_cum, _ = mesh_hierarchy_indices(splits=splits)
+    if level not in idx_by_level_cum:
+        raise ValueError(f"Requested level {level} is not available for splits={splits}")
+
+    m5_idx = idx_by_level_cum[level]
+    n_nodes = len(m5_idx)
+    n_times = len(npy_files)
+
+    first = load_activations(npy_files[0])
+    if first.shape[0] <= int(m5_idx.max()):
+        raise ValueError(
+            f"Activation file {os.path.basename(npy_files[0])} has only {first.shape[0]} nodes, "
+            f"but level {level} needs node index {int(m5_idx.max())}"
+        )
+
+    n_features = first.shape[1]
+
+    out = np.lib.format.open_memmap(
+        out_path,
+        mode="w+",
+        dtype=np.float32,
+        shape=(n_nodes, n_times, n_features),
+    )
+
+    for t, fpath in enumerate(npy_files):
+        acts = load_activations(fpath)
+
+        if acts.shape[0] <= int(m5_idx.max()):
+            raise ValueError(
+                f"Activation file {os.path.basename(fpath)} has only {acts.shape[0]} nodes, "
+                f"but level {level} needs node index {int(m5_idx.max())}"
+            )
+
+        out[:, t, :] = acts[m5_idx].astype(np.float32, copy=False)
+
+        if (t + 1) % 50 == 0 or t == n_times - 1:
+            print(f"Processed {t + 1}/{n_times} files")
+
+    out.flush()
+    print(f"Saved M{level} activation cube to {out_path} with shape {out.shape}")
+    return out_path
 
 def main():
 
     #plot_top_feature_deltas(delta, top_idx)
 
-    out_dir = "plots"
-    os.makedirs(out_dir, exist_ok=True)
+    # out_dir = "plots"
 
-    A = load_activations(ACTS_PATH)
-    vertices, idx_by_level_cum, idx_by_level_only = mesh_hierarchy_indices(splits=6)
-    lat, lon = vertices_to_latlon(vertices)
+    # A = load_activations(ACTS_PATH)
+    # vertices, idx_by_level_cum, idx_by_level_only = mesh_hierarchy_indices(splits=6)
+    # lat, lon = vertices_to_latlon(vertices)
 
-    idx_m0 = idx_by_level_cum[0]
-    idx_m6_only = idx_by_level_only[6]
-    delta, top_idx = summarize_groups(A, idx_m0, idx_m6_only)
+    # idx_m0 = idx_by_level_cum[0]
+    # idx_m6_only = idx_by_level_only[6]
+    # delta, top_idx = summarize_groups(A, idx_m0, idx_m6_only)
 
-    for feature_idx in top_idx[:3]:
-        plot_feature_across_levels(
-            A, lat, lon, idx_by_level_cum, int(feature_idx),
-            mode_name="cumulative", out_name=f"{out_dir}/feature_{feature_idx}_levels_cumulative.png"
-        )
-        plot_feature_across_levels(
-            A, lat, lon, idx_by_level_only, int(feature_idx),
-            mode_name="only-new-nodes", out_name=f"{out_dir}/feature_{feature_idx}_levels_only.png"
-        )
+    # for feature_idx in top_idx[:3]:
+    #     plot_feature_across_levels(
+    #         A, lat, lon, idx_by_level_cum, int(feature_idx),
+    #         mode_name="cumulative", out_name=f"{out_dir}/feature_{feature_idx}_levels_cumulative.png"
+    #     )
+    #     plot_feature_across_levels(
+    #         A, lat, lon, idx_by_level_only, int(feature_idx),
+    #         mode_name="only-new-nodes", out_name=f"{out_dir}/feature_{feature_idx}_levels_only.png"
+    #     )
+
+    save_m5_node_activations()
         
 
 if __name__ == "__main__":
