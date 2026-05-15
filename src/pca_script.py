@@ -61,6 +61,7 @@ def plot_yearly_mean_pcs(
     pca_mean_path,
     out_dir="plots",
     n_top_pcs=5,
+    scramble_activations=False,
 ):
     os.makedirs(out_dir, exist_ok=True)
 
@@ -77,8 +78,19 @@ def plot_yearly_mean_pcs(
     score_sum = None
     valid_count = 0
 
+    rng = np.random.default_rng()
+
     for f in npy_files:
         X = load_activations(f)
+        if scramble_activations:
+            X_scrambled = np.empty_like(X)
+            n_nodes, n_features = X.shape
+
+            for node_idx in range(n_nodes):
+                perm = rng.permutation(n_features)
+                X_scrambled[node_idx] = X[node_idx, perm]
+            X = X_scrambled
+
         if np.isnan(X).any():
             print(f"WARNING: skipping {os.path.basename(f)} because it contains NaNs")
             continue
@@ -198,13 +210,13 @@ def run_pca(
 
     return ipca
 
-
 if __name__ == "__main__":
     ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2021"
     PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components"
     P_COMPONENTS = os.path.join(PCA_DIR, "pca_components_2021.npy")
     P_MEAN       = os.path.join(PCA_DIR, "pca_mean_2021.npy")
     PLOTS_OUT    = "plots/2021_pca_projected_on_2021"
+    PLOTS_OUT_SCRAMBLED = "plots/2021_pca_scrambled_projected_on_2021"
 
     # ipca = run_pca(
     #     acts_dir=ACTS_DIR,
@@ -213,10 +225,12 @@ if __name__ == "__main__":
     #     out_dir=PCA_DIR,
     # )
     
+
     plot_yearly_mean_pcs(
         acts_dir=ACTS_DIR,
-        pca_components_path=P_COMPONENTS,
-        pca_mean_path=P_MEAN,
-        out_dir=PLOTS_OUT,
+        pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_components.npy',
+        pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_mean.npy',
+        out_dir=PLOTS_OUT_SCRAMBLED,
         n_top_pcs=5,
+        scramble_activations=True, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
     )
