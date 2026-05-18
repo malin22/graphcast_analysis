@@ -125,6 +125,22 @@ def plot_yearly_mean_pcs(
 
     print(f"Saved yearly mean PC maps from {valid_count} files to {out_dir}")
 
+def plot_cumulative_explained_variance(ipca, out_dir, max_components=None):
+    cumulative = np.cumsum(ipca.explained_variance_ratio_)
+
+    if max_components is not None:
+        cumulative = cumulative[:max_components]
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(np.arange(1, len(cumulative) + 1), cumulative, marker="o", linewidth=2)
+    plt.xlabel("Number of components")
+    plt.ylabel("Cumulative explained variance")
+    plt.title("PCA cumulative explained variance")
+    plt.ylim(0, 1.01)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(out_dir, "pca_cumulative_explained_variance.png"), dpi=300, bbox_inches="tight")
+    plt.close()
 
 def run_pca(
     acts_dir: str,
@@ -197,14 +213,17 @@ def run_pca(
     print(f"PCA mean vector shape: {ipca.mean_.shape}")
 
     # Save PCA basis for later reuse
-    np.save(os.path.join(out_dir, "pca_components.npy"), ipca.components_)
-    np.save(os.path.join(out_dir, "pca_mean.npy"), ipca.mean_)
+    np.save(os.path.join(out_dir, "pca_components_2021.npy"), ipca.components_)
+    np.save(os.path.join(out_dir, "pca_mean_2021.npy"), ipca.mean_)
     print(f"Saved PCA basis to {out_dir}/")
 
+    # Plot cumulative explained variance
+    plot_cumulative_explained_variance(ipca, out_dir)
+
     # Print explained variance
-    print("\nExplained variance ratio (first 20 components):")
+    print("\nExplained variance ratio:")
     print(ipca.explained_variance_ratio_)
-    print("Cumulative explained variance (first 20 components):")
+    print("Cumulative explained variance:")
     print(np.cumsum(ipca.explained_variance_ratio_))
 
 
@@ -213,24 +232,22 @@ def run_pca(
 if __name__ == "__main__":
     ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2021"
     PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components"
-    P_COMPONENTS = os.path.join(PCA_DIR, "pca_components_2021.npy")
-    P_MEAN       = os.path.join(PCA_DIR, "pca_mean_2021.npy")
     PLOTS_OUT    = "plots/2021_pca_projected_on_2021"
-    PLOTS_OUT_SCRAMBLED = "plots/2021_pca_scrambled_projected_on_2021"
 
     # ipca = run_pca(
     #     acts_dir=ACTS_DIR,
-    #     n_components=20,
+    #     n_components=400,
     #     batch_size=10,
     #     out_dir=PCA_DIR,
+  
     # )
     
 
     plot_yearly_mean_pcs(
         acts_dir=ACTS_DIR,
-        pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_components.npy',
-        pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_mean.npy',
-        out_dir=PLOTS_OUT_SCRAMBLED,
-        n_top_pcs=5,
-        scramble_activations=True, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
+        pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021.npy',
+        pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021.npy',
+        out_dir="plots/2021_pca_projected_on_2021_20pcs",
+        n_top_pcs=20,
+        scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
     )
