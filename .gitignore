@@ -1,4 +1,6 @@
 logs/
 .vscode/
 
+plots/malins_experiments/2021_pc_spatial_pattern_stability/data
+
 *code-workspace
