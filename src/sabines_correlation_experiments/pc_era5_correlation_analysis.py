@@ -1,289 +1,453 @@
 #!/usr/bin/env python3
-import os
-import json
 import gc
+import json
+import os
+from collections import defaultdict
+from pathlib import Path
+
 import numpy as np
-import xarray as xr
-from collections import defaultdict, Counter
 from graphcast import icosahedral_mesh
 
-# --- CONFIGURATION ---
-era5_dir = "/share/prj-4d/graphcast_shared/data/era5_daily_nc"
-activations_dir = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2021"
-pca_components_path = "/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021.npy"
-pca_mean_path = "/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021.npy"
+# ============================================================
+# CONFIGURATION
+# ============================================================
+ACTIVATIONS_DIR = Path("/share/prj-4d/graphcast_shared/data/graphcast_activation_2021")
 
-era5_vars = [
-    "geopotential", "specific_humidity", "temperature", "u_component_of_wind",
-    "v_component_of_wind", "vertical_velocity", "2m_temperature",
-    "10m_u_component_of_wind", "10m_v_component_of_wind",
-    "mean_sea_level_pressure", "total_precipitation_6hr",
-    "toa_incident_solar_radiation", "geopotential_at_surface", "land_sea_mask"
-]
+# Precomputed coarse ERA5 dataset produced by the coarse-grid export script
+# Expected layout:
+#   /share/prj-4d/graphcast_shared/data/era5_daily_course_grid/2021/
+#       time_values.npy
+#       metadata.json
+#       time_series/*.npy
+#       static/*.npy
+COARSE_ERA5_ROOT = Path("/share/prj-4d/graphcast_shared/data/era5_daily_course_grid/2021")
+COARSE_TIME_VALUES = COARSE_ERA5_ROOT / "time_values.npy"
+COARSE_TIME_SERIES_DIR = COARSE_ERA5_ROOT / "time_series"
+COARSE_STATIC_DIR = COARSE_ERA5_ROOT / "static"
 
-# How many top PCs to analyze
-n_pcs_to_check = 20
-# How many top ERA5 variables to keep per PC
-top_k = 5
+PCA_COMPONENTS_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021.npy"
+PCA_MEAN_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021.npy"
 
-# Coarse grid for aggregation
+RESULTS_DIR = Path("plots/sabines_experiments")
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+YEARLY_SUMMARY_PATH = RESULTS_DIR / "pc_era5_yearly_top_variables.json"
+
+# User controls
+N_PCS_TO_CHECK = 20
+TOP_K = 5
 LAT_RES = 2.5
 LON_RES = 2.5
-lat_bins = np.arange(-90, 90.1, LAT_RES)
-lon_bins = np.arange(0, 360.1, LON_RES)
+MIN_POINTS = 10
+VERBOSE_TIMESTEPS = True
 
-results_dir = "plots/sabines_experiments"
-os.makedirs(results_dir, exist_ok=True)
-yearly_summary_path = os.path.join(results_dir, "pc_era5_yearly_top_variables.json")
+lat_bins = np.arange(-90, 90.0 + LAT_RES, LAT_RES)
+lon_bins = np.arange(0, 360.0 + LON_RES, LON_RES)
 
 
-# -------------------------
-# Utilities
-# -------------------------
-def get_mesh_latlon(splits=6):
+# ============================================================
+# NUMERIC HELPERS
+# ============================================================
+def to_float32(x) -> np.ndarray:
+    arr = np.asarray(x)
+    if arr.dtype == np.dtype("|V2"):
+        arr = arr.view(np.float16)
+    return np.asarray(arr, dtype=np.float32)
+
+
+def load_activation_matrix(path: Path) -> np.ndarray:
+    """
+    Load saved GraphCast activations and coerce to a numeric float32 matrix.
+    Expected output shape: [n_nodes, n_features]
+    """
+    x = np.load(path, mmap_mode="r")
+
+    if x.dtype == np.dtype("|V2"):
+        x = x.view(np.float16)
+
+    x = np.asarray(x, dtype=np.float32)
+
+    # Common saved shapes from your earlier scripts
+    if x.ndim == 3 and x.shape[1] == 1:
+        x = x[:, 0, :]
+
+    x = np.squeeze(x)
+
+    if x.ndim != 2:
+        raise ValueError(f"Expected activation matrix [nodes, features], got shape {x.shape}")
+
+    return x
+
+
+# ============================================================
+# MESH / GRID MAPPING
+# ============================================================
+def get_mesh_latlon(splits: int = 6):
     meshes = icosahedral_mesh.get_hierarchy_of_triangular_meshes_for_sphere(splits=splits)
     vertices = meshes[6].vertices
     lat = np.degrees(np.arcsin(vertices[:, 2]))
     lon = np.degrees(np.arctan2(vertices[:, 1], vertices[:, 0]))
-    return lat, lon
-
-def get_era5_latlon(ds):
-    era5_lat = ds['lat'].values
-    era5_lon = ds['lon'].values
-    lon2d, lat2d = np.meshgrid(era5_lon, era5_lat)
-    return lat2d.ravel(), lon2d.ravel()
-
-def aggregate_to_grid(values, lats, lons, lat_bins, lon_bins):
-    values = np.asarray(values, dtype=np.float32).ravel()
-    lats = np.asarray(lats, dtype=np.float32).ravel()
-    lons = np.asarray(lons, dtype=np.float32).ravel()
-    
-    grid = np.full((len(lat_bins)-1, len(lon_bins)-1), np.nan, dtype=np.float32)
-    sums = np.zeros_like(grid, dtype=np.float64)
-    counts = np.zeros_like(grid, dtype=np.int32)
-    
-    lat_idx = np.digitize(lats, lat_bins) - 1
-    lon_idx = np.digitize(lons % 360, lon_bins) - 1
-    
-    for v, i, j in zip(values, lat_idx, lon_idx):
-        if 0 <= i < grid.shape[0] and 0 <= j < grid.shape[1]:
-            if np.isfinite(v):
-                sums[i, j] += float(v)
-                counts[i, j] += 1
-    
-    valid = counts > 0
-    grid[valid] = (sums[valid] / counts[valid]).astype(np.float32)
-    return grid
-
-def safe_corr(a, b, min_points=10):
-    mask = ~np.isnan(a) & ~np.isnan(b)
-    if mask.sum() < min_points:
-        return None
-    a2 = a[mask]; b2 = b[mask]
-    if np.nanstd(a2) == 0 or np.nanstd(b2) == 0:
-        return None
-    return float(np.corrcoef(a2, b2)[0, 1])
-
-def _open_and_trim(path: str) -> xr.Dataset:
-    ds = xr.open_dataset(path)
-    if "time" in ds.dims and ds.sizes["time"] > 4:
-        ds = ds.isel(time=slice(0, 4))
-    return ds
-
-def three_step_window(data_dir: str, center_time: str) -> xr.Dataset | None:
-    t0 = np.datetime64(center_time)
-    t_minus = t0 - np.timedelta64(6, "h")
-    t_plus  = t0 + np.timedelta64(6, "h")
-    needed_days = sorted({
-        np.datetime64(t_minus, "D"),
-        np.datetime64(t0, "D"),
-        np.datetime64(t_plus, "D"),
-    })
-    file_paths = [os.path.join(data_dir, f"era5_{str(d)[:10]}.nc") for d in needed_days]
-    if any(not os.path.exists(p) for p in file_paths):
-        return None
-    daily = [_open_and_trim(p) for p in file_paths]
-    var_time = [v for v, da in daily[0].data_vars.items() if "time" in da.dims]
-    var_static = [v for v, da in daily[0].data_vars.items() if "time" not in da.dims]
-    ds_time = xr.concat([d[var_time] for d in daily], dim="time").sortby("time")
-    ds_static = daily[0][var_static]
-    ds = xr.merge([ds_time, ds_static])
-    target_times = np.array([t_minus, t0, t_plus], dtype=ds.time.dtype)
-    if not all(t in ds.time.values for t in target_times):
-        return None
-    ds = ds.sel(time=target_times)
-    ds_new = ds.copy()
-    for v in ds_new.data_vars:
-        if "time" in ds_new[v].dims:
-            ds_new[v] = ds_new[v].expand_dims("batch")
-    for c in ds.coords:
-        if "time" in ds[c].dims:
-            ds_new = ds_new.assign_coords({c: ds[c].expand_dims("batch")})
-    time_orig = ds["time"]
-    t_ref = time_orig.values[0]
-    time_delta = time_orig - t_ref
-    ds_new = ds_new.assign_coords(time=time_delta)
-    ds_new = ds_new.assign_coords(datetime=("time", time_orig.values))
-    ds_new = ds_new.assign_coords({"datetime": ds_new["datetime"].expand_dims("batch")})
-    return ds_new
+    return lat.astype(np.float32), lon.astype(np.float32)
 
 
-# -------------------------
-# Main
-# -------------------------
+def build_node_cell_index(lat: np.ndarray, lon: np.ndarray, lat_edges: np.ndarray, lon_edges: np.ndarray):
+    """
+    Build a node -> coarse-cell mapping for the mesh nodes.
+    """
+    lon_mod = np.mod(lon, 360.0)
+
+    lat_idx = np.digitize(lat, lat_edges) - 1
+    lon_idx = np.digitize(lon_mod, lon_edges) - 1
+
+    n_lat = len(lat_edges) - 1
+    n_lon = len(lon_edges) - 1
+
+    valid = (
+        (lat_idx >= 0) & (lat_idx < n_lat) &
+        (lon_idx >= 0) & (lon_idx < n_lon)
+    )
+
+    cell_idx = lat_idx * n_lon + lon_idx
+    return cell_idx, valid, n_lat, n_lon
+
+
+def coarsen_1d_field(values: np.ndarray, cell_idx: np.ndarray, valid: np.ndarray, n_lat: int, n_lon: int) -> np.ndarray:
+    """
+    Vectorized binning of node values onto the coarse grid using np.add.at.
+    """
+    values = to_float32(values).ravel()
+    values = values[valid]
+    idx = cell_idx[valid]
+
+    finite = np.isfinite(values)
+    values = values[finite]
+    idx = idx[finite]
+
+    sums = np.zeros(n_lat * n_lon, dtype=np.float64)
+    counts = np.zeros(n_lat * n_lon, dtype=np.int32)
+
+    np.add.at(sums, idx, values)
+    np.add.at(counts, idx, 1)
+
+    out = np.full(n_lat * n_lon, np.nan, dtype=np.float32)
+    mask = counts > 0
+    out[mask] = (sums[mask] / counts[mask]).astype(np.float32)
+    return out.reshape(n_lat, n_lon)
+
+
+def project_activations_to_pc_grids(
+    activations: np.ndarray,
+    pca_mean: np.ndarray,
+    pca_components: np.ndarray,
+    n_pcs: int,
+    cell_idx: np.ndarray,
+    valid: np.ndarray,
+    n_lat: int,
+    n_lon: int,
+) -> tuple[list[str], np.ndarray]:
+    """
+    Project activation vectors onto PCA components, then coarse-bin each PC map.
+    Returns:
+      pc_names: list of PC labels
+      pc_grids: array with shape [n_pcs, n_lat, n_lon]
+    """
+    if activations.shape[1] != pca_mean.shape[0]:
+        raise ValueError(
+            f"Activation feature dimension {activations.shape[1]} does not match pca_mean {pca_mean.shape[0]}"
+        )
+
+    centered = activations - pca_mean
+    pcs = pca_components[:n_pcs]
+    pc_scores = centered @ pcs.T  # [n_nodes, n_pcs]
+
+    pc_grids = np.empty((n_pcs, n_lat, n_lon), dtype=np.float32)
+    for pc_idx in range(n_pcs):
+        pc_grids[pc_idx] = coarsen_1d_field(pc_scores[:, pc_idx], cell_idx, valid, n_lat, n_lon)
+
+    pc_names = [f"PC_{i + 1}" for i in range(n_pcs)]
+    return pc_names, pc_grids
+
+
+# ============================================================
+# COARSE ERA5 LOADING
+# ============================================================
+def load_coarse_catalog(root: Path):
+    """
+    Load the precomputed coarse ERA5 dataset as memmaps.
+    Time-series fields live in time_series/*.npy.
+    Static fields live in static/*.npy.
+    """
+    if not COARSE_TIME_VALUES.exists():
+        raise FileNotFoundError(f"Missing coarse time index file: {COARSE_TIME_VALUES}")
+
+    time_values = np.load(COARSE_TIME_VALUES, allow_pickle=False)
+    time_index = {
+        np.datetime_as_string(np.datetime64(t), unit="h"): i
+        for i, t in enumerate(time_values)
+    }
+
+    time_series = {}
+    for path in sorted(COARSE_TIME_SERIES_DIR.glob("*.npy")):
+        time_series[path.stem] = np.load(path, mmap_mode="r")
+
+    static_fields = {}
+    for path in sorted(COARSE_STATIC_DIR.glob("*.npy")):
+        static_fields[path.stem] = np.load(path, mmap_mode="r")
+
+    if not time_series and not static_fields:
+        raise FileNotFoundError(f"No coarse ERA5 files found under {root}")
+
+    return time_index, time_series, static_fields
+
+
+def load_coarse_feature_grids(
+    time_index: dict,
+    time_series: dict,
+    static_fields: dict,
+    center_str: str,
+) -> tuple[list[str], np.ndarray]:
+    """
+    Load one timestep's coarse ERA5 fields into:
+      feature_names: list[str]
+      grids: [n_features, n_lat, n_lon]
+    """
+    if center_str not in time_index:
+        return [], np.empty((0, 0, 0), dtype=np.float32)
+
+    t_idx = time_index[center_str]
+    feature_names = []
+    grids = []
+
+    for name in sorted(time_series.keys()):
+        arr = time_series[name]
+        grid = to_float32(arr[t_idx])
+        grids.append(grid)
+        feature_names.append(name)
+
+    for name in sorted(static_fields.keys()):
+        arr = static_fields[name]
+        grid = to_float32(arr)
+        grids.append(grid)
+        feature_names.append(name)
+
+    if not grids:
+        return [], np.empty((0, 0, 0), dtype=np.float32)
+
+    grids = np.stack(grids, axis=0)
+    return feature_names, grids
+
+
+# ============================================================
+# MATRIX CORRELATION
+# ============================================================
+def batch_correlation_matrix(P: np.ndarray, E: np.ndarray, min_points: int = 10):
+    """
+    Compute correlations between rows of P and rows of E using one matrix multiply.
+
+    P: [n_pcs, n_cells]
+    E: [n_features, n_cells]
+
+    Returns:
+      corr_matrix: [n_pcs, n_features]
+      n_used: number of spatial cells used
+    """
+    if P.ndim != 2 or E.ndim != 2:
+        raise ValueError(f"Expected 2D matrices, got P={P.shape}, E={E.shape}")
+
+    mask = np.isfinite(P).all(axis=0) & np.isfinite(E).all(axis=0)
+    n_used = int(mask.sum())
+    if n_used < min_points:
+        return None, n_used
+
+    P = P[:, mask].astype(np.float64, copy=False)
+    E = E[:, mask].astype(np.float64, copy=False)
+
+    P0 = P - P.mean(axis=1, keepdims=True)
+    E0 = E - E.mean(axis=1, keepdims=True)
+
+    Pstd = P0.std(axis=1, ddof=0, keepdims=True)
+    Estd = E0.std(axis=1, ddof=0, keepdims=True)
+
+    valid_p = (Pstd[:, 0] > 0)
+    valid_e = (Estd[:, 0] > 0)
+
+    corr = np.full((P.shape[0], E.shape[0]), np.nan, dtype=np.float32)
+
+    if valid_p.any() and valid_e.any():
+        Pz = P0[valid_p] / Pstd[valid_p]
+        Ez = E0[valid_e] / Estd[valid_e]
+        corr[np.ix_(valid_p, valid_e)] = (Pz @ Ez.T) / n_used
+
+    return corr, n_used
+
+
+# ============================================================
+# MAIN
+# ============================================================
 def main():
     print("Loading PCA components and mean...")
-    pca_components = np.load(pca_components_path)  # (n_pcs, n_features)
-    pca_mean = np.load(pca_mean_path)  # (n_features,)
+    pca_components = np.load(PCA_COMPONENTS_PATH)
+    pca_mean = np.load(PCA_MEAN_PATH)
+
     print(f" pca_components.shape: {pca_components.shape}")
     print(f" pca_mean.shape: {pca_mean.shape}")
 
+    if pca_components.ndim != 2:
+        raise ValueError(f"Expected pca_components to be 2D, got {pca_components.shape}")
+
+    n_pcs_available = pca_components.shape[0]
+    n_pcs = min(N_PCS_TO_CHECK, n_pcs_available)
+    print(f"\nAnalyzing {n_pcs} PCs (out of {n_pcs_available} available)\n")
+
+    print("Loading coarse ERA5 catalog...")
+    time_index, time_series, static_fields = load_coarse_catalog(COARSE_ERA5_ROOT)
+    print(f" Loaded {len(time_series)} time-series coarse files and {len(static_fields)} static coarse files")
+    print(f" Loaded {len(time_index)} coarse timesteps")
+
     mesh_lat, mesh_lon = get_mesh_latlon(splits=6)
     n_mesh_nodes = mesh_lat.size
+    print(f"Mesh nodes: {n_mesh_nodes}")
 
-    activation_files = sorted([os.path.join(activations_dir, f) for f in os.listdir(activations_dir) if f.endswith(".npy")])
-    centers = [os.path.basename(f).split("_t")[-1].replace(".npy", "") for f in activation_files]
+    cell_idx, valid, n_lat, n_lon = build_node_cell_index(mesh_lat, mesh_lon, lat_bins, lon_bins)
+    print(f"Coarse grid shape: {n_lat} x {n_lon}")
 
-    # Per-PC aggregation: pc_idx -> var_name -> {'sum_abs_r': float, 'count': int, 'wins': int}
-    pc_stats = defaultdict(lambda: defaultdict(lambda: {'sum_abs_r': 0.0, 'count': 0, 'wins': 0}))
-    pc_timestep_count = Counter()
+    activation_files = sorted(ACTIVATIONS_DIR.glob("*.npy"))
+    centers = [p.stem.split("_t")[-1] for p in activation_files]
+    print(f"Found {len(activation_files)} activation files")
 
-    n_pcs = min(n_pcs_to_check, pca_components.shape[0])
-    print(f"\nAnalyzing {n_pcs} PCs (out of {pca_components.shape[0]} available)\n")
+    # Stats per PC per ERA5 feature
+    pc_stats = defaultdict(lambda: defaultdict(lambda: {"sum_abs_r": 0.0, "count": 0, "wins": 0}))
+    processed_timesteps = 0
 
-    print(f"Loading activations and a matching era5 window per timestep...")
     for act_file, center_str in zip(activation_files, centers):
-        print(f"  Processing {center_str}")
+        print(f"\nProcessing {center_str}")
 
-        # Load GC activations
-        activations = np.load(act_file)
-        if activations.dtype == np.dtype("|V2"):
-            activations = activations.view(np.float16)
-        activations = np.asarray(activations, dtype=np.float32)
-        activations = np.squeeze(activations)
-        
-        if activations.ndim != 2:
-            print(f"  Skipping: unexpected shape {activations.shape}")
+        if center_str not in time_index:
+            print("  Skipping: no matching coarse ERA5 timestep")
+            continue
+
+        activations = load_activation_matrix(act_file)
+        print(f"  activations.shape: {activations.shape}")
+
+        if activations.shape[0] != n_mesh_nodes:
+            print(f"  Warning: activation nodes {activations.shape[0]} != mesh nodes {n_mesh_nodes}")
+
+        feature_names, era5_grids = load_coarse_feature_grids(
+            time_index=time_index,
+            time_series=time_series,
+            static_fields=static_fields,
+            center_str=center_str,
+        )
+
+        if era5_grids.size == 0:
+            print("  Skipping: no coarse ERA5 features loaded")
             del activations
             gc.collect()
             continue
 
-        n_nodes_act, n_feat_act = activations.shape
-        if n_nodes_act != n_mesh_nodes:
-            print(f"  Warning: activation nodes {n_nodes_act} != mesh nodes {n_mesh_nodes}")
+        print(f"  Loaded coarse ERA5 features: {len(feature_names)}")
 
-        # Load ERA5 for this timestep
-        ds = three_step_window(era5_dir, center_str)
-        if ds is None:
-            print(f"  Skipping: missing ERA5 data")
-            del activations
+        # Project activations onto PCs and bin to the same coarse grid
+        pc_names, pc_grids = project_activations_to_pc_grids(
+            activations=activations,
+            pca_mean=pca_mean,
+            pca_components=pca_components,
+            n_pcs=n_pcs,
+            cell_idx=cell_idx,
+            valid=valid,
+            n_lat=n_lat,
+            n_lon=n_lon,
+        )
+
+        # Batched correlations: PC rows vs ERA5 rows
+        P = pc_grids.reshape(n_pcs, -1)
+        E = era5_grids.reshape(era5_grids.shape[0], -1)
+
+        corr_matrix, n_used = batch_correlation_matrix(P, E, min_points=MIN_POINTS)
+        if corr_matrix is None:
+            print(f"  Skipping: not enough common valid cells ({n_used})")
+            del activations, era5_grids, pc_grids
             gc.collect()
             continue
-        era5_lat, era5_lon = get_era5_latlon(ds)
-        print(f"  Done loading ERA5 data with variables: {list(ds.data_vars.keys())}")
 
-        # Build ERA5 coarse grids
-        era5_features = []
-        for var in era5_vars:
-            if var not in ds:
+        if VERBOSE_TIMESTEPS:
+            print(f"  Correlation matrix computed using {n_used} common grid cells")
+
+        for pc_idx, pc_name in enumerate(pc_names):
+            row = corr_matrix[pc_idx]
+            valid_row = np.isfinite(row)
+            if not valid_row.any():
+                print(f"  {pc_name}: no valid correlations")
                 continue
-            arr = ds[var].values
-            if arr.dtype == np.dtype("|V2"):
-                arr = arr.view(np.float16)
-            arr = np.asarray(arr, dtype=np.float32)
-            arr = np.squeeze(arr)
-            
-            if arr.ndim == 4:  # (window, level, lat, lon)
-                arr_mean = np.nanmean(arr, axis=0)
-                for lev_idx in range(arr_mean.shape[0]):
-                    feat = arr_mean[lev_idx].ravel()
-                    era5_grid = aggregate_to_grid(feat, era5_lat, era5_lon, lat_bins, lon_bins)
-                    era5_features.append((f"{var}_lev{lev_idx}", era5_grid))
-            elif arr.ndim == 3:  # (window, lat, lon)
-                arr_mean = np.nanmean(arr, axis=0)
-                feat = arr_mean.ravel()
-                era5_grid = aggregate_to_grid(feat, era5_lat, era5_lon, lat_bins, lon_bins)
-                era5_features.append((var, era5_grid))
-            elif arr.ndim == 2:  # (lat, lon)
-                feat = arr.ravel()
-                era5_grid = aggregate_to_grid(feat, era5_lat, era5_lon, lat_bins, lon_bins)
-                era5_features.append((var, era5_grid))
-        print(f"  Done processing ERA5 features: {[v[0] for v in era5_features]} and aggregating to grid")
 
-        # For each PC: project activations onto PC, then correlate with ERA5
-        for pc_idx in range(n_pcs):
-            pc_component = pca_components[pc_idx]  # (n_features,)
-            # Project activations onto this PC: (n_nodes, n_features) @ (n_features,) -> (n_nodes,)
-            pc_scores = activations @ pc_component  # spatial map of this PC at this timestep
-            pc_grid = aggregate_to_grid(pc_scores, mesh_lat, mesh_lon, lat_bins, lon_bins)
-            print(f"  Done projecting activations onto PC_{pc_idx+1} and aggregating to grid")
+            best_j = int(np.nanargmax(np.abs(row)))
+            best_name = feature_names[best_j]
+            best_r = float(row[best_j])
 
-            # Correlate with each ERA5 variable
-            var_rs = {}
-            for var_name, era5_grid in era5_features:
-                r = safe_corr(pc_grid.ravel(), era5_grid.ravel())
-                if r is None:
+            if VERBOSE_TIMESTEPS:
+                print(f"  For timestep {center_str} and {pc_name} - top variable = {best_name} with r={best_r:.3f}")
+
+            # Update yearly stats
+            for j, feature_name in enumerate(feature_names):
+                r = row[j]
+                if not np.isfinite(r):
                     continue
-                var_rs[var_name] = r
-                # Update running stats
-                s = pc_stats[pc_idx][var_name]
-                s['sum_abs_r'] += abs(r)
-                s['count'] += 1
+                s = pc_stats[pc_idx][feature_name]
+                s["sum_abs_r"] += abs(float(r))
+                s["count"] += 1
 
-            # Record winner for this PC at this timestep
-            if var_rs:
-                winner_name, winner_r = max(var_rs.items(), key=lambda kv: abs(kv[1]))
-                pc_stats[pc_idx][winner_name]['wins'] += 1
-            print(f"For timestep {center_str} and PC_{pc_idx+1} - top variable = {winner_name} with r={winner_r:.3f}" if var_rs else f"    for timestep {center_str}: PC_{pc_idx+1} - no valid correlations")
+            pc_stats[pc_idx][best_name]["wins"] += 1
 
-        pc_timestep_count[pc_idx] += 1
+        processed_timesteps += 1
 
-        # Free memory
+        # Free per-timestep memory
         del activations
-        del era5_features
-        del ds
+        del era5_grids
+        del pc_grids
+        del corr_matrix
         gc.collect()
 
-    # -------------------------
-    # Post-process: for each PC, rank ERA5 variables by mean |r|
-    # -------------------------
+    # ========================================================
+    # YEARLY SUMMARY
+    # ========================================================
     summary = {}
     for pc_idx in range(n_pcs):
-        var_list = []
-        for var_name, stats in pc_stats[pc_idx].items():
-            if stats['count'] > 0:
-                mean_abs_r = stats['sum_abs_r'] / stats['count']
-            else:
-                mean_abs_r = 0.0
-            var_list.append({
-                'variable': var_name,
-                'mean_abs_r': mean_abs_r,
-                'wins': stats['wins'],
-                'count': stats['count']
+        rows = []
+        for feature_name, stats in pc_stats[pc_idx].items():
+            if stats["count"] == 0:
+                continue
+            rows.append({
+                "variable": feature_name,
+                "mean_abs_r": stats["sum_abs_r"] / stats["count"],
+                "wins": stats["wins"],
+                "count": stats["count"],
             })
-        
-        # Sort by mean |r| descending
-        var_list_sorted = sorted(var_list, key=lambda x: (-x['mean_abs_r'], -x['wins']))
-        top_vars = var_list_sorted[:top_k]
-        
-        summary[f"PC_{pc_idx+1}"] = {
-            'top_variables': top_vars,
-            'total_timesteps': pc_timestep_count[pc_idx]
+
+        rows_sorted = sorted(rows, key=lambda x: (-x["mean_abs_r"], -x["wins"]))
+        summary[f"PC_{pc_idx + 1}"] = {
+            "top_variables": rows_sorted[:TOP_K],
+            "total_timesteps": processed_timesteps,
         }
 
-    # Save JSON summary
-    with open(yearly_summary_path, "w") as f:
+    with open(YEARLY_SUMMARY_PATH, "w") as f:
         json.dump(summary, f, indent=2)
 
-    # Print summary
-    print("\n=== Yearly PC -> ERA5 Summary (Top Variables per PC) ===\n")
-    for pc_key, info in sorted(summary.items(), key=lambda kv: int(kv[0].split('_')[1])):
+    print("\n=== Yearly PC -> ERA5 Summary ===\n")
+    for pc_key, info in sorted(summary.items(), key=lambda kv: int(kv[0].split("_")[1])):
         print(f"{pc_key} (timesteps: {info['total_timesteps']})")
-        for i, var_info in enumerate(info['top_variables'], 1):
-            print(f"  {i}. {var_info['variable']}: mean_|r|={var_info['mean_abs_r']:.3f}, wins={var_info['wins']}, count={var_info['count']}")
+        if not info["top_variables"]:
+            print("  no valid correlations")
+            continue
+        for i, item in enumerate(info["top_variables"], 1):
+            print(
+                f"  {i}. {item['variable']}: "
+                f"mean_|r|={item['mean_abs_r']:.3f}, "
+                f"wins={item['wins']}, "
+                f"count={item['count']}"
+            )
         print()
 
-    print(f"\nSaved summary to {yearly_summary_path}")
+    print(f"Saved summary to {YEARLY_SUMMARY_PATH}")
+
 
 if __name__ == "__main__":
     main()
