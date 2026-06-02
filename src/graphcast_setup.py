@@ -41,15 +41,15 @@ gcs_bucket = gcs_client.get_bucket("dm_graphcast")
 dir_prefix = "graphcast/"
 
 data_dir = '/share/prj-4d/graphcast_shared/data/era5_daily_nc'        # contains era5_YYYY-MM-DD.nc
-acts_dir = '/share/prj-4d/graphcast_shared/data/graphcast_activation_2021'
+acts_dir = '/share/prj-4d/graphcast_shared/data/graphcast_activation_2020'
 os.makedirs(acts_dir, exist_ok=True)
 
 
 # done: 01, 
 ### extracting time 00, 06, 12, 18
 centers = np.arange(
-    np.datetime64("2021-02-01T00"), # produces nodes for time 06, 12, 18
-    np.datetime64("2021-03-01T00"), # exclusive
+    np.datetime64("2020-01-01T00"), # produces nodes for time 06, 12, 18, 00
+    np.datetime64("2020-01-01T06"), # exclusive
     np.timedelta64(6, "h"),
 )
 

@@ -97,8 +97,8 @@ if __name__ == "__main__":
 
     write_daily_era5_files(
         ds,
-        start="2021-11-01",
-        end="2021-11-30",
+        start="2020-09-01",
+        end="2020-09-30",
         out_dir="/share/prj-4d/graphcast_shared/data/era5_daily_nc",
     )
 
