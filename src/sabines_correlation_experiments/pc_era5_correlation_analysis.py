@@ -9,7 +9,7 @@ import re
 import numpy as np
 from graphcast import icosahedral_mesh
 
-from sklearn.linear_model import ElasticNet, Ridge
+from sklearn.linear_model import ElasticNet, Ridge, Lasso
 from sklearn.preprocessing import StandardScaler
 
 # ============================================================
@@ -415,10 +415,17 @@ def _fit_linear_model_with_alpha_grid(
                 fit_intercept=True,
                 max_iter=20000,
                 tol=1e-4,
+                random_state=0,)
+        elif model_type == "lasso":
+            model = Lasso(
+                alpha=float(alpha),
+                fit_intercept=True,
+                max_iter=20000,
+                tol=1e-4,
                 random_state=0,
             )
         else:
-            raise ValueError("model_type must be Ridge or ElasticNet")
+            raise ValueError("model_type must be Ridge, Lasso or ElasticNet")
 
         model.fit(X_train_z, y_train_z)
         score = model.score(X_val_z, y_val_z)
@@ -624,7 +631,10 @@ def fit_pc_era5_sparse_model(
         activation_files = sorted(ACTIVATIONS_DIR.glob("*.npy"))
 
     if alpha_grid is None:
-        alpha_grid = np.logspace(-4, -1, 12) if model_type.lower() == "elasticnet" else np.logspace(-3, 3, 25)
+        if model_type.lower() in ("elasticnet", "lasso"):
+            alpha_grid = np.logspace(-4, -1, 12)
+        else:
+            alpha_grid = np.logspace(-3, 3, 25)
 
     print("Loading PCA components and mean...")
     pca_components = np.load(PCA_COMPONENTS_PATH)
@@ -798,8 +808,8 @@ def main():
     parser = argparse.ArgumentParser(description="PC to ERA5 screening and regression")
     parser.add_argument(
         "--model-type",
-        choices=["Ridge", "ElasticNet"],
-        default="ElasticNet",
+        choices=["Ridge", "ElasticNet", "Lasso"],
+        default="Lasso",
         help="Regression model to fit after screening",
     )
     parser.add_argument(
