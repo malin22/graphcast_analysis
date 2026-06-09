@@ -51,7 +51,7 @@ def compute_similarity_matrix(maps, mode: str) -> np.ndarray:
     maps: list of arrays, each [nodes]
     mode:
         - "z_scored": Pearson correlation of z-scored maps
-        - "dot_product": raw dot product of raw maps, scaled by number of nodes
+        - "dot_product": raw dot product of raw maps, scaled by number of nodes and normalized per PC
     """
     M = np.stack(maps, axis=0).astype(np.float32)
 
@@ -62,10 +62,17 @@ def compute_similarity_matrix(maps, mode: str) -> np.ndarray:
         sim = np.clip(sim, -1, 1)
 
     elif mode == "dot_product":
-        # Raw dot product:
-        # preserves spatial structure AND overall magnitude.
-        # Not clipped, because dot-product values are not correlations.
-        sim = (M @ M.T) / M.shape[1]
+
+        # Normalize whole PC by its global scale across time/nodes
+        global_scale = np.std(M) + 1e-8
+
+        M_normed = M / global_scale
+
+        # Dot product keeps:
+        # - spatial structure
+        # - temporal magnitude changes
+        # but now comparable across PCs
+        sim = (M_normed @ M_normed.T) / M.shape[1]
 
     else:
         raise ValueError(f"Unknown mode: {mode}")
@@ -330,9 +337,6 @@ def save_lag_plot(
 
 
 
-# -----------------------------
-# Main analysis
-# -----------------------------
 def main():
     ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2021"
     PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components"

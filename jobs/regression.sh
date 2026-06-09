@@ -19,6 +19,6 @@ source /home/student/m/mbraatz/miniconda/etc/profile.d/conda.sh
 conda activate graphcast
 
 # Run your script
-srun python -u src/graphcast_setup.py
+srun python -u src/malins_pca_experiments/regression.py
 
 echo "Finished at: $(date)"

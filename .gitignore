@@ -1,6 +1,10 @@
 logs/
 .vscode/
 
+data_venv
+graphcast
+
 plots/malins_experiments/2021_pc_spatial_pattern_stability/data
+plots/malins_experiments/2021_pc_correlations_per_timestep
 
 *code-workspace
