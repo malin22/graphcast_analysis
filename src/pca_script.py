@@ -139,7 +139,7 @@ def plot_cumulative_explained_variance(ipca, out_dir, max_components=None):
     plt.ylim(0, 1.01)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, "pca_cumulative_explained_variance.png"), dpi=300, bbox_inches="tight")
+    plt.savefig(os.path.join(out_dir, "pca_cumulative_explained_variance_2021.png"), dpi=300, bbox_inches="tight")
     plt.close()
 
 def run_pca(
@@ -231,23 +231,25 @@ def run_pca(
 
 if __name__ == "__main__":
     ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2021"
-    PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components"
+    PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components_test"
     PLOTS_OUT    = "plots/2021_pca_projected_on_2021"
 
-    # ipca = run_pca(
-    #     acts_dir=ACTS_DIR,
-    #     n_components=400,
-    #     batch_size=10,
-    #     out_dir=PCA_DIR,
+    ipca = run_pca(
+        acts_dir=ACTS_DIR,
+        n_components=400,
+        batch_size=10,
+        out_dir=PCA_DIR,
   
-    # )
+    )
+
+    plot_cumulative_explained_variance()
     
 
-    plot_yearly_mean_pcs(
-        acts_dir=ACTS_DIR,
-        pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021.npy',
-        pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021.npy',
-        out_dir="plots/2021_pca_projected_on_2021_20pcs",
-        n_top_pcs=20,
-        scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
-    )
+    # plot_yearly_mean_pcs(
+    #     acts_dir=ACTS_DIR,
+    #     pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021.npy',
+    #     pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021.npy',
+    #     out_dir="plots/2021_pca_projected_on_2021_20pcs",
+    #     n_top_pcs=20,
+    #     scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
+    # )
