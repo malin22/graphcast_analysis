@@ -1,72 +1,48 @@
 import os
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 
-# =====================
-# CONFIG
-# =====================
+CSV_PATH = "plots/malins_experiments/2021_regression/PCA/ridge/l5_nodes/pc_regression_physical_variables.csv"
 
-BASE_PATH = "plots/malins_experiments/2021_pc_physical_variable_regression/derived_targets/"
-
-CSV_PATH = os.path.join(BASE_PATH, "pc_regression_physical_variables.csv")
-
-OUT_DIR = os.path.join(BASE_PATH, "figures")
+OUT_DIR = "plots/malins_experiments/2021_regression/PCA/ridge/l5_nodes/figures"
 os.makedirs(OUT_DIR, exist_ok=True)
 
-THRESHOLD = 0.8
 
-VARIABLE_ORDER = [
-    "windspeed850",
-    "rh850",
-    "thickness500_850",
-]
+SURFACE_VARIABLES = ["2t", "10u", "10v", "msl", "tp"]
+
+ATMOSPHERIC_GROUPS = {
+    "temperature": ["t50", "t250", "t500", "t600", "t700", "t850", "t1000"],
+    "u_wind": ["u50", "u250", "u500", "u600", "u700", "u850", "u1000"],
+    "v_wind": ["v50", "v250", "v500", "v600", "v700", "v850", "v1000"],
+    "geopotential": ["z50", "z250", "z500", "z600", "z700", "z850", "z1000"],
+    "specific_humidity": ["q50", "q250", "q500", "q600", "q700", "q850", "q1000"],
+    "vertical_velocity": ["w50", "w250", "w500", "w600", "w700", "w850", "w1000"],
+}
 
 
-# =====================
-# HELPERS
-# =====================
+df = pd.read_csv(CSV_PATH)
 
-def load_results(csv_path):
-    df = pd.read_csv(csv_path)
+if "n_pcs" not in df.columns and "n_features" in df.columns:
+    df = df.rename(columns={"n_features": "n_pcs"})
 
-    required = {"target", "n_features", "r2_test", "rmse_test", "corr_test"}
-    missing = required - set(df.columns)
-    if missing:
-        raise ValueError(f"Missing required columns: {missing}")
 
-    df = df.copy()
-    df["target"] = pd.Categorical(
-        df["target"],
-        categories=VARIABLE_ORDER,
+def plot_r2_group(df, targets, title, filename):
+    plot_df = df[df["target"].isin(targets)].copy()
+
+    order = [t for t in targets if t in plot_df["target"].unique()]
+    plot_df["target"] = pd.Categorical(
+        plot_df["target"],
+        categories=order,
         ordered=True,
     )
-    df = df.sort_values(["target", "n_features"])
+    plot_df = plot_df.sort_values(["target", "n_pcs"])
 
-    return df
+    plt.figure(figsize=(9, 5.5))
 
-
-def savefig(name):
-    path = os.path.join(OUT_DIR, name)
-    plt.tight_layout()
-    plt.savefig(path, dpi=300, bbox_inches="tight")
-    plt.close()
-    print(f"Saved: {path}")
-
-
-# =====================
-# PLOTS
-# =====================
-
-def plot_r2_curves(df):
-    plt.figure(figsize=(8, 5))
-
-    for target, g in df.groupby("target", observed=True):
-        if pd.isna(target):
-            continue
+    for target, g in plot_df.groupby("target", observed=True):
         plt.plot(
-            g["n_features"],
+            g["n_pcs"],
             g["r2_test"],
             marker="o",
             linewidth=2,
@@ -75,116 +51,39 @@ def plot_r2_curves(df):
 
     plt.xscale("log")
     plt.xticks(
-        sorted(df["n_features"].unique()),
-        labels=[str(x) for x in sorted(df["n_features"].unique())],
+        sorted(plot_df["n_pcs"].unique()),
+        labels=[str(x) for x in sorted(plot_df["n_pcs"].unique())],
     )
+
     plt.xlabel("Number of PCs")
     plt.ylabel("Test R²")
-    plt.title("Physical-variable decodability from GraphCast latent PCs")
+    plt.title(title)
     plt.ylim(0, 1)
     plt.grid(True, alpha=0.3)
-    plt.legend(title="Target", ncol=2)
-    savefig("r2_vs_number_of_pcs.png")
+    plt.legend(title="Target", ncol=3, fontsize=9)
+
+    out_path = os.path.join(OUT_DIR, filename)
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
+    plt.close()
+
+    print(f"Saved: {out_path}")
 
 
+# Surface variables together
+plot_r2_group(
+    df,
+    SURFACE_VARIABLES,
+    "Decodability of surface ERA5 variables from GraphCast PCs",
+    "r2_surface_variables.png",
+)
 
 
-def plot_r2_heatmap(df):
-    pivot = df.pivot(index="target", columns="n_features", values="r2_test")
-    pivot = pivot.loc[[v for v in VARIABLE_ORDER if v in pivot.index]]
-
-    plt.figure(figsize=(8, 4.5))
-    im = plt.imshow(pivot.values, aspect="auto", vmin=0, vmax=1)
-
-    plt.colorbar(im, label="Test R²")
-
-    plt.yticks(
-        ticks=np.arange(len(pivot.index)),
-        labels=pivot.index,
+# One plot per atmospheric variable, all levels together
+for group_name, targets in ATMOSPHERIC_GROUPS.items():
+    plot_r2_group(
+        df,
+        targets,
+        f"Decodability of {group_name.replace('_', ' ')} across pressure levels",
+        f"r2_{group_name}_levels.png",
     )
-    plt.xticks(
-        ticks=np.arange(len(pivot.columns)),
-        labels=pivot.columns,
-    )
-
-    for i in range(pivot.shape[0]):
-        for j in range(pivot.shape[1]):
-            value = pivot.values[i, j]
-            plt.text(
-                j,
-                i,
-                f"{value:.2f}",
-                ha="center",
-                va="center",
-                fontsize=8,
-            )
-
-    plt.xlabel("Number of PCs")
-    plt.ylabel("Target variable")
-    plt.title("Decodability heatmap")
-    savefig("r2_heatmap.png")
-
-
-def plot_pcs_needed_for_threshold(df):
-    rows = []
-
-    for target, g in df.groupby("target", observed=True):
-        if pd.isna(target):
-            continue
-
-        g = g.sort_values("n_features")
-        max_r2 = g["r2_test"].max()
-        threshold_value = THRESHOLD * max_r2
-
-        reached = g[g["r2_test"] >= threshold_value]
-
-        if len(reached) == 0:
-            pcs_needed = np.nan
-        else:
-            pcs_needed = int(reached.iloc[0]["n_features"])
-
-        rows.append({
-            "target": str(target),
-            "max_r2": max_r2,
-            "threshold_r2": threshold_value,
-            "pcs_needed": pcs_needed,
-        })
-
-    summary = pd.DataFrame(rows)
-    summary["target"] = pd.Categorical(
-        summary["target"],
-        categories=VARIABLE_ORDER,
-        ordered=True,
-    )
-    summary = summary.sort_values("target")
-
-    summary_path = os.path.join(
-        OUT_DIR,
-        f"pcs_needed_for_{int(THRESHOLD * 100)}pct_max_r2.csv"
-    )
-    summary.to_csv(summary_path, index=False)
-    print(f"Saved: {summary_path}")
-
-    plt.figure(figsize=(7, 4.5))
-    plt.bar(summary["target"].astype(str), summary["pcs_needed"])
-
-    plt.xlabel("Target variable")
-    plt.ylabel(f"PCs needed for {int(THRESHOLD * 100)}% of max R²")
-    plt.title("Effective PC dimensionality by physical variable")
-    plt.grid(axis="y", alpha=0.3)
-
-    savefig(f"pcs_needed_for_{int(THRESHOLD * 100)}pct_max_r2.png")
-
-
-def main():
-    df = load_results(CSV_PATH)
-
-    plot_r2_curves(df)
-    #plot_r2_heatmap(df)
-    #plot_pcs_needed_for_threshold(df)
-
-    print("\nDone.")
-
-
-if __name__ == "__main__":
-    main()
