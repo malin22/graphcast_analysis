@@ -145,23 +145,30 @@ def load_hour_grouped_maps(years, activation_template, pca_mean, pca_components,
     print(f"Used files: {used_files}")
     return by_hour
 
-
-def mean_pairwise_cosine(A, B):
+def mean_pairwise_cosine(A, B, exclude_self_pairs=False):
     """
     A: [n_a, n_pcs, n_nodes]
     B: [n_b, n_pcs, n_nodes]
 
     Returns:
       [n_pcs] mean cosine similarity over all A/B pairs.
+
+    If exclude_self_pairs=True, removes the diagonal self-comparisons.
+    This should be used for same-hour comparisons, e.g. 00 vs 00.
     """
-    # Average vector dot products over all sample pairs without materializing
-    # [n_a, n_b, n_pcs].
     n_pcs = A.shape[1]
     out = np.zeros(n_pcs, dtype=np.float64)
 
     for pc in range(n_pcs):
-        # Since vectors are normalized, dot product is cosine similarity.
         dots = A[:, pc, :] @ B[:, pc, :].T
+
+        if exclude_self_pairs:
+            if dots.shape[0] != dots.shape[1]:
+                raise ValueError("Can only exclude self-pairs for square same-hour comparisons.")
+
+            mask = ~np.eye(dots.shape[0], dtype=bool)
+            dots = dots[mask]
+
         out[pc] = np.nanmean(dots)
 
     return out.astype(np.float32)
@@ -173,8 +180,18 @@ def compute_hour_similarity_matrix(by_hour):
 
     for i, h1 in enumerate(HOURS):
         for j, h2 in enumerate(HOURS):
-            print(f"Comparing {h1:02d} vs {h2:02d}", flush=True)
-            sim[:, i, j] = mean_pairwise_cosine(by_hour[h1], by_hour[h2])
+            exclude_self = i == j
+            print(
+                f"Comparing {h1:02d} vs {h2:02d} "
+                f"(exclude_self_pairs={exclude_self})",
+                flush=True,
+            )
+
+            sim[:, i, j] = mean_pairwise_cosine(
+                by_hour[h1],
+                by_hour[h2],
+                exclude_self_pairs=exclude_self,
+            )
 
     return sim
 
@@ -240,6 +257,39 @@ def plot_diurnal_ranking(pc_labels, same_hour, opposite, contrast, output_path):
     plt.ylabel("Cosine similarity")
     plt.title("PC diurnal-cycle contrast")
     plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300)
+    plt.close()
+
+def plot_daily_cycle_curve(sim_pc, pc_label, output_path):
+    """
+    Plot mean similarity as a function of UTC-hour lag.
+
+    sim_pc: [4, 4] hour-pair similarity matrix for one PC.
+    """
+    lag_values = [0, 6, 12, 18]
+    lag_means = []
+
+    for lag_steps in range(4):
+        vals = []
+        for i in range(4):
+            j = (i + lag_steps) % 4
+            vals.append(sim_pc[i, j])
+        lag_means.append(np.nanmean(vals))
+
+    # Repeat lag 0 at 24 hours to visually close the daily cycle.
+    plot_lags = np.asarray([0, 6, 12, 18, 24])
+    plot_vals = np.asarray(lag_means + [lag_means[0]])
+
+    plt.figure(figsize=(6.5, 4.2))
+    plt.plot(plot_lags, plot_vals, marker="o", linewidth=2)
+    plt.axvline(12, color="gray", linestyle="--", linewidth=1, alpha=0.7)
+    plt.xlabel("Hour lag")
+    plt.ylabel("Mean centered cosine similarity")
+    plt.title(f"{pc_label}: daily-cycle similarity curve")
+    plt.xticks(plot_lags)
+    plt.ylim(-1, 1)
+    plt.grid(alpha=0.25)
     plt.tight_layout()
     plt.savefig(output_path, dpi=300)
     plt.close()
@@ -310,6 +360,14 @@ def main():
             args.output_dir / f"{pc_labels[idx]}_diurnal_heatmap.png",
         )
 
+    best_idx = top[0]
+
+    plot_daily_cycle_curve(
+        sim[best_idx],
+        pc_labels[best_idx],
+        args.output_dir / f"{pc_labels[best_idx]}_daily_cycle_curve.png",
+    )
+
     print("\nTop PCs by diurnal contrast:")
     for idx in top:
         print(
@@ -318,6 +376,12 @@ def main():
             f"opposite={opposite[idx]:.3f}, "
             f"contrast={contrast[idx]:.3f}"
         )
+# should show: 
+# 0h lag    high
+# 6h lag    intermediate
+# 12h lag   lowest
+# 18h lag   intermediate
+# 24h lag   high again
 
     print(f"\nSaved outputs to {args.output_dir}")
 

@@ -10,8 +10,8 @@ from graphcast import grid_mesh_connectivity
 
 INPUT_DIR = Path("/share/prj-4d/graphcast_shared/data/era5_daily_nc")
 OUTPUT_DIR = Path("/share/prj-4d/graphcast_shared/data/era5_daily_mesh")
-YEAR = 2021
-MESH_LEVEL = 5
+YEAR = 2020
+MESH_LEVEL = 6
 
 # This matches the GraphCast-style radius fraction.
 # GraphCast docs describe reasonable values as 0.6 to 1.0.
@@ -36,7 +36,25 @@ DEFAULT_VARS = [
 
 
 def list_year_files(input_dir: Path, year: int) -> list[Path]:
-    return sorted(input_dir.glob(f"era5_{year:04d}-*.nc"))
+    files = sorted(input_dir.glob(f"era5_{year:04d}-*.nc"))
+
+    good_files = []
+    bad_files = []
+
+    for path in files:
+        try:
+            ds = xr.open_dataset(path)
+            ds.close()
+            good_files.append(path)
+        except Exception as e:
+            bad_files.append((path, repr(e)))
+
+    if bad_files:
+        print("Skipping files xarray cannot decode:")
+        for path, err in bad_files:
+            print(f"  {path.name}: {err}")
+
+    return good_files
 
 
 def open_era5(path: Path) -> xr.Dataset:
