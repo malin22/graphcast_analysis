@@ -1,0 +1,702 @@
+{
+  "PC_1": {
+    "top_variables": [
+      {
+        "variable": "land_sea_mask",
+        "mean_abs_r": 0.7502911056802753,
+        "wins": 1453,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev34",
+        "mean_abs_r": 0.6014599763190263,
+        "wins": 0,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev35",
+        "mean_abs_r": 0.6014585288040243,
+        "wins": 0,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev36",
+        "mean_abs_r": 0.5957026847747795,
+        "wins": 0,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev33",
+        "mean_abs_r": 0.5821150292098235,
+        "wins": 0,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_2": {
+    "top_variables": [
+      {
+        "variable": "specific_humidity_lev26",
+        "mean_abs_r": 0.4842173398484547,
+        "wins": 1079,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev25",
+        "mean_abs_r": 0.4766497874538897,
+        "wins": 219,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev27",
+        "mean_abs_r": 0.4739080069398191,
+        "wins": 31,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev24",
+        "mean_abs_r": 0.4591114899247413,
+        "wins": 1,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev28",
+        "mean_abs_r": 0.44892672258086314,
+        "wins": 0,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_3": {
+    "top_variables": [
+      {
+        "variable": "temperature_lev10",
+        "mean_abs_r": 0.6018757966372036,
+        "wins": 813,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev11",
+        "mean_abs_r": 0.5983125945246802,
+        "wins": 273,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev12",
+        "mean_abs_r": 0.5369687014543345,
+        "wins": 1,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev09",
+        "mean_abs_r": 0.5092525744819674,
+        "wins": 0,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev17",
+        "mean_abs_r": 0.49714218710753644,
+        "wins": 103,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_4": {
+    "top_variables": [
+      {
+        "variable": "temperature_lev03",
+        "mean_abs_r": 0.4672432552884251,
+        "wins": 32,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev02",
+        "mean_abs_r": 0.4628136229792037,
+        "wins": 19,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev04",
+        "mean_abs_r": 0.4616260084145156,
+        "wins": 36,
+        "count": 1453
+      },
+      {
+        "variable": "geopotential_lev00",
+        "mean_abs_r": 0.45655780702072063,
+        "wins": 107,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev01",
+        "mean_abs_r": 0.45421846365845836,
+        "wins": 15,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_5": {
+    "top_variables": [
+      {
+        "variable": "temperature_lev28",
+        "mean_abs_r": 0.47070729208460205,
+        "wins": 484,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev29",
+        "mean_abs_r": 0.4690491065167593,
+        "wins": 210,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev27",
+        "mean_abs_r": 0.4687591541432875,
+        "wins": 282,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev26",
+        "mean_abs_r": 0.46460562172177244,
+        "wins": 49,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev30",
+        "mean_abs_r": 0.4613856308146829,
+        "wins": 2,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_6": {
+    "top_variables": [
+      {
+        "variable": "geopotential_lev36",
+        "mean_abs_r": 0.3065503941001518,
+        "wins": 983,
+        "count": 1453
+      },
+      {
+        "variable": "geopotential_lev35",
+        "mean_abs_r": 0.29794647259521057,
+        "wins": 3,
+        "count": 1453
+      },
+      {
+        "variable": "mean_sea_level_pressure",
+        "mean_abs_r": 0.29344785731370415,
+        "wins": 154,
+        "count": 1453
+      },
+      {
+        "variable": "geopotential_lev34",
+        "mean_abs_r": 0.2891304400087387,
+        "wins": 10,
+        "count": 1453
+      },
+      {
+        "variable": "geopotential_lev33",
+        "mean_abs_r": 0.2800589632640316,
+        "wins": 26,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_7": {
+    "top_variables": [
+      {
+        "variable": "geopotential_lev33",
+        "mean_abs_r": 0.3457423521478834,
+        "wins": 154,
+        "count": 1453
+      },
+      {
+        "variable": "geopotential_lev34",
+        "mean_abs_r": 0.34476854135804724,
+        "wins": 141,
+        "count": 1453
+      },
+      {
+        "variable": "geopotential_lev32",
+        "mean_abs_r": 0.344272719125705,
+        "wins": 72,
+        "count": 1453
+      },
+      {
+        "variable": "geopotential_lev35",
+        "mean_abs_r": 0.34126256830882634,
+        "wins": 74,
+        "count": 1453
+      },
+      {
+        "variable": "geopotential_lev31",
+        "mean_abs_r": 0.34067810965216083,
+        "wins": 27,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_8": {
+    "top_variables": [
+      {
+        "variable": "land_sea_mask",
+        "mean_abs_r": 0.23560377291909432,
+        "wins": 605,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev31",
+        "mean_abs_r": 0.22543158286288945,
+        "wins": 276,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev32",
+        "mean_abs_r": 0.21971375159842346,
+        "wins": 84,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev23",
+        "mean_abs_r": 0.21876443723051284,
+        "wins": 44,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev24",
+        "mean_abs_r": 0.21476763693509393,
+        "wins": 15,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_9": {
+    "top_variables": [
+      {
+        "variable": "u_component_of_wind_lev34",
+        "mean_abs_r": 0.440145356340894,
+        "wins": 295,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev33",
+        "mean_abs_r": 0.4391759231389184,
+        "wins": 358,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev35",
+        "mean_abs_r": 0.4381557092409009,
+        "wins": 141,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev36",
+        "mean_abs_r": 0.4375544774556931,
+        "wins": 321,
+        "count": 1453
+      },
+      {
+        "variable": "10m_u_component_of_wind",
+        "mean_abs_r": 0.43501786523577435,
+        "wins": 149,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_10": {
+    "top_variables": [
+      {
+        "variable": "v_component_of_wind_lev36",
+        "mean_abs_r": 0.4494230443866845,
+        "wins": 401,
+        "count": 1453
+      },
+      {
+        "variable": "10m_v_component_of_wind",
+        "mean_abs_r": 0.44908128782378665,
+        "wins": 433,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev35",
+        "mean_abs_r": 0.44709619916642196,
+        "wins": 319,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev34",
+        "mean_abs_r": 0.4358862817123358,
+        "wins": 12,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev33",
+        "mean_abs_r": 0.4129662405948186,
+        "wins": 0,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_11": {
+    "top_variables": [
+      {
+        "variable": "v_component_of_wind_lev34",
+        "mean_abs_r": 0.37021403538713105,
+        "wins": 290,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev33",
+        "mean_abs_r": 0.36912867486353834,
+        "wins": 272,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev35",
+        "mean_abs_r": 0.3664147470707903,
+        "wins": 80,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev36",
+        "mean_abs_r": 0.36554884071688115,
+        "wins": 259,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev32",
+        "mean_abs_r": 0.3619168588849322,
+        "wins": 29,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_12": {
+    "top_variables": [
+      {
+        "variable": "geopotential_lev36",
+        "mean_abs_r": 0.353890171419401,
+        "wins": 323,
+        "count": 1453
+      },
+      {
+        "variable": "mean_sea_level_pressure",
+        "mean_abs_r": 0.3487464681124162,
+        "wins": 360,
+        "count": 1453
+      },
+      {
+        "variable": "geopotential_lev35",
+        "mean_abs_r": 0.34799585066843425,
+        "wins": 86,
+        "count": 1453
+      },
+      {
+        "variable": "geopotential_lev34",
+        "mean_abs_r": 0.339272801476516,
+        "wins": 51,
+        "count": 1453
+      },
+      {
+        "variable": "geopotential_lev33",
+        "mean_abs_r": 0.32836128671570886,
+        "wins": 31,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_13": {
+    "top_variables": [
+      {
+        "variable": "geopotential_at_surface",
+        "mean_abs_r": 0.2422605269644294,
+        "wins": 569,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev17",
+        "mean_abs_r": 0.22092698182185108,
+        "wins": 102,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev18",
+        "mean_abs_r": 0.21951115021644915,
+        "wins": 89,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev16",
+        "mean_abs_r": 0.21363638381423083,
+        "wins": 47,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev19",
+        "mean_abs_r": 0.21278028867251694,
+        "wins": 65,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_14": {
+    "top_variables": [
+      {
+        "variable": "geopotential_at_surface",
+        "mean_abs_r": 0.2699099966803667,
+        "wins": 645,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev16",
+        "mean_abs_r": 0.2586684587366074,
+        "wins": 141,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev15",
+        "mean_abs_r": 0.25843867214482485,
+        "wins": 178,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev14",
+        "mean_abs_r": 0.25220186724817845,
+        "wins": 84,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev17",
+        "mean_abs_r": 0.2503034727313317,
+        "wins": 34,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_15": {
+    "top_variables": [
+      {
+        "variable": "geopotential_at_surface",
+        "mean_abs_r": 0.3072426750209934,
+        "wins": 525,
+        "count": 1453
+      },
+      {
+        "variable": "2m_temperature",
+        "mean_abs_r": 0.2434539230768383,
+        "wins": 247,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev25",
+        "mean_abs_r": 0.2254938703781559,
+        "wins": 23,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev30",
+        "mean_abs_r": 0.2246839183716633,
+        "wins": 12,
+        "count": 1453
+      },
+      {
+        "variable": "v_component_of_wind_lev26",
+        "mean_abs_r": 0.2245106053809749,
+        "wins": 12,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_16": {
+    "top_variables": [
+      {
+        "variable": "temperature_lev35",
+        "mean_abs_r": 0.3105013775809092,
+        "wins": 248,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev36",
+        "mean_abs_r": 0.3084776271942231,
+        "wins": 408,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev34",
+        "mean_abs_r": 0.30792334143018524,
+        "wins": 24,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev33",
+        "mean_abs_r": 0.30253278587913396,
+        "wins": 0,
+        "count": 1453
+      },
+      {
+        "variable": "temperature_lev32",
+        "mean_abs_r": 0.2979705089245553,
+        "wins": 0,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_17": {
+    "top_variables": [
+      {
+        "variable": "u_component_of_wind_lev15",
+        "mean_abs_r": 0.2618483837132444,
+        "wins": 55,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev14",
+        "mean_abs_r": 0.2614754960556237,
+        "wins": 50,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev13",
+        "mean_abs_r": 0.26082737771544223,
+        "wins": 83,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev16",
+        "mean_abs_r": 0.2605261490189939,
+        "wins": 57,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev12",
+        "mean_abs_r": 0.2595485204347478,
+        "wins": 136,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_18": {
+    "top_variables": [
+      {
+        "variable": "geopotential_at_surface",
+        "mean_abs_r": 0.40318826901363,
+        "wins": 1368,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev26",
+        "mean_abs_r": 0.2609834926073418,
+        "wins": 26,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev25",
+        "mean_abs_r": 0.25880277896760173,
+        "wins": 19,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev27",
+        "mean_abs_r": 0.25720536751904655,
+        "wins": 2,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev28",
+        "mean_abs_r": 0.24969585286036738,
+        "wins": 0,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_19": {
+    "top_variables": [
+      {
+        "variable": "u_component_of_wind_lev16",
+        "mean_abs_r": 0.3502563107181892,
+        "wins": 730,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev15",
+        "mean_abs_r": 0.3492972334130255,
+        "wins": 419,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev14",
+        "mean_abs_r": 0.34106894166651713,
+        "wins": 124,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev17",
+        "mean_abs_r": 0.3379893763592058,
+        "wins": 69,
+        "count": 1453
+      },
+      {
+        "variable": "u_component_of_wind_lev13",
+        "mean_abs_r": 0.324136329513538,
+        "wins": 30,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  },
+  "PC_20": {
+    "top_variables": [
+      {
+        "variable": "geopotential_at_surface",
+        "mean_abs_r": 0.30126864822544236,
+        "wins": 939,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev19",
+        "mean_abs_r": 0.20070316900447246,
+        "wins": 129,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev20",
+        "mean_abs_r": 0.19419527476757933,
+        "wins": 26,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev18",
+        "mean_abs_r": 0.18836660942201183,
+        "wins": 10,
+        "count": 1453
+      },
+      {
+        "variable": "specific_humidity_lev21",
+        "mean_abs_r": 0.1741874174349342,
+        "wins": 2,
+        "count": 1453
+      }
+    ],
+    "total_timesteps": 1453
+  }
+}
