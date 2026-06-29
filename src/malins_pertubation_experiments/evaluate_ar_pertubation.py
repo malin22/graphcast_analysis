@@ -15,31 +15,33 @@ from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
 # CONFIG
 # =====================
 
-THRESHOLD = None
+THRESHOLD = 0.8
 CENTER_STR = "2021-01-03T06"
+NODE_HIERARCHY_LEVEL = 5
 
+# Only generate videos for the lowest, highest, and control gamma values.
+VIDEO_GAMMA_SELECTION = [-0.5, 0.5]
 
 BASE_DIR = os.path.join(
     "plots",
     "malins_experiments",
     "pertubation_experiments",
     "AR",
+    f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}",
     f"pertubation_threshold_{THRESHOLD}",
     CENTER_STR,
 )
 
 INPUT_DIR = os.path.join(BASE_DIR, "data")
 OUT_DIR = os.path.join(BASE_DIR, "evaluation")
-
-
 MASK_DIR = "/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned"
-USE_MASK = True
 
+USE_MASK = True
 CONTROL_GAMMA = 0.0
 MAX_MASK_TIME_DIFFERENCE_HOURS = 3
 
 # Standard AR-like IVT threshold; used only as an auxiliary metric.
-IVT_THRESHOLD = 250.0
+#IVT_THRESHOLD = 250.0
 
 # Keep the same plots as before, but make them for first and last rollout step.
 TIME_SELECTIONS = ["first", "last"]
@@ -53,8 +55,7 @@ VIDEO_FORMAT = "mp4"  # "mp4" needs ffmpeg; use "gif" if ffmpeg is unavailable.
 # Optional: reduce video resolution / file size by plotting every nth frame.
 VIDEO_FRAME_STRIDE = 1
 
-# Only generate videos for the lowest, highest, and control gamma values.
-VIDEO_GAMMA_SELECTION = "extremes_and_control"
+
 
 # Variable names in GraphCast output
 Q_VAR = "specific_humidity"
@@ -68,6 +69,16 @@ G = 9.80665
 # =====================
 # FILE HANDLING
 # =====================
+
+def get_valid_time(ds, time_index):
+    if "datetime" in ds.coords:
+        dt = ds["datetime"]
+        if "batch" in dt.dims:
+            dt = dt.isel(batch=0)
+        return pd.Timestamp(dt.isel(time=time_index).values)
+
+    # fallback: CENTER_STR + forecast lead
+    return pd.Timestamp(CENTER_STR) + pd.to_timedelta(ds.time.values[time_index])
 
 def parse_gamma_and_time(path):
     path = Path(path)
@@ -193,6 +204,18 @@ def get_lon_name(da):
         return "longitude"
     raise ValueError("Could not find longitude coordinate.")
 
+def format_lead_time(hours):
+    """Format forecast lead time as e.g. 6h, 1d, 1d 6h."""
+    hours = int(hours)
+    days = hours // 24
+    rem_hours = hours % 24
+
+    if days == 0:
+        return f"{rem_hours}h"
+    if rem_hours == 0:
+        return f"{days}d"
+    return f"{days}d {rem_hours}h"
+
 
 def area_weighted_mean(da, mask=None):
     lat_name = get_lat_name(da)
@@ -251,12 +274,16 @@ def nearest_mask_file(center_time):
     return best_file
 
 
-def load_mask_on_grid(center_time, target_da):
+def load_mask_on_grid(target_time, target_da):
     """
-    Load ClimateNet mask and interpolate to forecast lat/lon grid.
-    Uses annotator intersection.
+    Load nearest ClimateNet mask for target_time and interpolate to forecast grid.
+    Returns:
+        mask_interp, mask_path, mask_time, diff_hours
     """
-    mask_path = nearest_mask_file(center_time)
+    mask_path = nearest_mask_file(target_time)
+
+    mask_time = pd.Timestamp(os.path.basename(mask_path).replace(".nc", ""))
+    diff_hours = abs(mask_time - pd.Timestamp(target_time)) / pd.Timedelta(hours=1)
 
     ds = xr.open_dataset(mask_path)
     label = ds["label"]
@@ -280,14 +307,45 @@ def load_mask_on_grid(center_time, target_da):
     if rename:
         mask_interp = mask_interp.rename(rename)
 
-    return mask_interp.astype(bool), mask_path
+    return mask_interp.astype(bool), mask_path, mask_time, diff_hours
+
+def find_next_timestep_with_mask(ds_full, start_time_index, direction=1):
+    """
+    Starting from start_time_index, move through forecast timesteps until
+    a ClimateNet mask within MAX_MASK_TIME_DIFFERENCE_HOURS is found.
+
+    direction=1  -> search forward
+    direction=-1 -> search backward
+    """
+    n_times = ds_full.sizes["time"]
+
+    if start_time_index < 0:
+        start_time_index = n_times + start_time_index
+
+    indices = range(start_time_index, n_times) if direction == 1 else range(start_time_index, -1, -1)
+
+    for t_idx in indices:
+        valid_time = get_valid_time(ds_full, t_idx)
+
+        try:
+            # Just test whether a suitable mask exists
+            mask_path = nearest_mask_file(valid_time)
+            mask_time = pd.Timestamp(os.path.basename(mask_path).replace(".nc", ""))
+            mask_diff_h = abs(mask_time - valid_time) / pd.Timedelta(hours=1)
+
+            return t_idx, valid_time, mask_path, mask_time, mask_diff_h
+
+        except Exception as e:
+            print(f"[NO MASK] forecast step {t_idx}, valid_time={valid_time}: {e}")
+
+    return None, None, None, None, None
 
 
 # =====================
 # PLOTTING
 # =====================
 
-def plot_dose_response(summary, metric, ylabel, out_name, out_dir):
+def plot_dose_response(summary, metric, ylabel, out_name, out_dir, extra_title=None):
     plt.figure(figsize=(6, 4))
 
     for center_time, group in summary.groupby("center_time"):
@@ -297,7 +355,12 @@ def plot_dose_response(summary, metric, ylabel, out_name, out_dir):
     plt.axvline(0.0, color="black", linewidth=1)
     plt.xlabel("Gamma")
     plt.ylabel(ylabel)
-    plt.title(ylabel + " vs gamma")
+
+    title = ylabel + " vs gamma"
+    if extra_title is not None:
+        title += "\n" + extra_title
+
+    plt.title(title)
     plt.grid(True, alpha=0.3)
 
     if summary["center_time"].nunique() <= 6:
@@ -307,6 +370,60 @@ def plot_dose_response(summary, metric, ylabel, out_name, out_dir):
     out_path = os.path.join(out_dir, out_name)
     plt.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close()
+    print("Saved:", out_path)
+
+def plot_inside_outside_dose_response(
+    summary,
+    out_name,
+    out_dir,
+    extra_title=None,
+):
+    plt.figure(figsize=(7, 5))
+
+    for center_time, group in summary.groupby("center_time"):
+        group = group.sort_values("gamma")
+
+        plt.plot(
+            group["gamma"],
+            group["delta_ivt_inside_mask_mean"],
+            marker="o",
+            linewidth=2,
+            linestyle="-",
+            label=f"Inside AR Mask",
+        )
+
+        plt.plot(
+            group["gamma"],
+            group["delta_ivt_outside_mask_mean"],
+            marker="s",
+            linewidth=2,
+            linestyle="--",
+            label=f"Outside AR Mask",
+        )
+
+    plt.axvline(0, color="black", linewidth=1)
+    plt.axhline(0, color="grey", linewidth=0.8)
+
+    plt.xlabel("Gamma")
+    plt.ylabel("Mean ΔIVT")
+
+    title = "Dose response of IVT"
+    if extra_title is not None:
+        title += "\n" + extra_title
+
+    plt.title(title)
+
+    plt.grid(True, alpha=0.3)
+
+    if summary["center_time"].nunique() <= 6:
+        plt.legend(fontsize=8)
+
+    plt.tight_layout()
+
+    out_path = os.path.join(out_dir, out_name)
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
+    plt.close()
+
     print("Saved:", out_path)
 
 
@@ -403,8 +520,15 @@ def make_delta_ivt_video(center_time, gamma, control_file, perturbed_file):
             vmax=vmax,
             add_colorbar=False,
         )
-        lead = str(delta.time.values[i])
-        ax.set_title(f"ΔIVT trajectory: gamma={gamma:+.2f}, {center_time}, lead={lead}")
+
+        lead_hours = int(
+            pd.to_timedelta(delta.time.values[i]).total_seconds() / 3600
+        )
+
+        ax.set_title(
+            f"ΔIVT: gamma={gamma:+.2f}, "
+            f"{center_time}, T+{format_lead_time(lead_hours)}"
+        )
         return []
 
     anim = FuncAnimation(fig, update, frames=delta.sizes["time"], interval=500)
@@ -452,11 +576,7 @@ def evaluate_one_step(time_selection):
             center_time.strftime("%Y-%m-%dT%H"),
         )
 
-        out_dir = os.path.join(
-            center_dir,
-            "evaluation",
-            f"lead_{time_selection}",
-        )
+        out_dir = os.path.join(OUT_DIR, f"lead_{time_selection}")
 
         os.makedirs(out_dir, exist_ok=True)
 
@@ -478,8 +598,48 @@ def evaluate_one_step(time_selection):
 
         if USE_MASK:
             try:
-                ar_mask, mask_path = load_mask_on_grid(center_time, control_ivt)
-                print(f"Using mask for {center_time}: {mask_path}")
+                if time_selection == "first":
+                    time_index = 0
+                elif time_selection == "last":
+                    time_index = -1
+                else:
+                    raise ValueError(time_selection)
+
+                control_ds_full = load_prediction(
+                    file_table[file_table["gamma"] == CONTROL_GAMMA]["file"].iloc[0],
+                    time_selection=None,
+                )
+
+                search_direction = 1 if time_selection == "first" else -1
+
+                matched_time_index, valid_time, mask_path, mask_time, mask_diff_h = find_next_timestep_with_mask(
+                    control_ds_full,
+                    time_index,
+                    direction=search_direction,
+                )
+
+                if matched_time_index is None:
+                    raise ValueError(f"No usable mask found for {time_selection} lead.")
+
+                # Reload prediction at the matched timestep, not necessarily first/last anymore
+                for _, row in file_table.iterrows():
+                    key = (row["center_time"], row["gamma"])
+                    ds_full = load_prediction(row["file"], time_selection=None)
+                    ds_step = ds_full.isel(time=matched_time_index)
+                    datasets[key] = ds_step
+                    ivts[key] = compute_ivt(ds_step)
+
+                control_ivt = ivts[control_key]
+
+                ar_mask, mask_path, mask_time, mask_diff_h = load_mask_on_grid(
+                    valid_time,
+                    control_ivt,
+                )
+
+                print(
+                    f"Using forecast step {matched_time_index}: valid={valid_time}, "
+                    f"mask={mask_time}, diff={mask_diff_h:.1f} h"
+                )
             except Exception as e:
                 print(f"[WARN] Could not load mask for {center_time}: {e}")
 
@@ -489,13 +649,17 @@ def evaluate_one_step(time_selection):
             ivt = ivts[key]
             delta_ivt = ivt - control_ivt
 
-            ar_like = ivt >= IVT_THRESHOLD
-            control_ar_like = control_ivt >= IVT_THRESHOLD
+            #ar_like = ivt >= IVT_THRESHOLD
+            #control_ar_like = control_ivt >= IVT_THRESHOLD
 
             rec = {
                 "time_selection": time_selection,
                 "center_time": str(center_time),
                 "gamma": gamma,
+                "matched_time_index": matched_time_index,
+                "forecast_valid_time": str(valid_time),
+                "mask_time": str(mask_time),
+                "mask_time_diff_h": mask_diff_h,
                 "file": file_table[
                     (file_table["center_time"] == center_time)
                     & (file_table["gamma"] == gamma)
@@ -505,8 +669,8 @@ def evaluate_one_step(time_selection):
                 "ivt_global_max": max_value(ivt),
                 "delta_ivt_global_mean": area_weighted_mean(delta_ivt),
                 "delta_ivt_global_max_abs": max_value(abs(delta_ivt)),
-                "ar_like_area_fraction": area_fraction(ar_like),
-                "delta_ar_like_area_fraction": area_fraction(ar_like) - area_fraction(control_ar_like),
+                #"ar_like_area_fraction": area_fraction(ar_like),
+                #"delta_ar_like_area_fraction": area_fraction(ar_like) - area_fraction(control_ar_like),
             }
 
             if TP_VAR in ds:
@@ -558,29 +722,37 @@ def evaluate_one_step(time_selection):
     print("Saved:", summary_path)
     print(summary)
 
+    extra_title = (
+        f"forecast valid: {valid_time.strftime('%Y-%m-%dT%H')} | "
+        f"mask: {mask_time.strftime('%Y-%m-%dT%H')} "
+        f"({mask_diff_h:.1f} h diff)"
+    )
+
     plot_dose_response(
         summary,
         metric="delta_ivt_global_mean",
         ylabel=f"Global mean ΔIVT ({time_selection} lead)",
         out_name=f"dose_response_delta_ivt_global_mean_{time_selection}.png",
         out_dir=out_dir,
+        extra_title = extra_title
     )
 
     if "delta_ivt_inside_mask_mean" in summary.columns:
-        plot_dose_response(
-            summary,
-            metric="delta_ivt_inside_mask_mean",
-            ylabel=f"Mean ΔIVT inside AR mask ({time_selection} lead)",
-            out_name=f"dose_response_delta_ivt_inside_mask_mean_{time_selection}.png",
-            out_dir=out_dir,
-        )
 
-        plot_dose_response(
+        init_time = pd.Timestamp(CENTER_STR)
+        lead_hours = int((valid_time - init_time) / pd.Timedelta(hours=1))
+
+        extra_title = (
+            f"Forecast: {valid_time:%Y-%m-%d %H:%M} "
+            f"(start t + {format_lead_time(lead_hours)})\n"
+            f"ClimateNet mask: {mask_time:%Y-%m-%d %H:%M} "
+            f"(Δt = {mask_diff_h:.1f} h)"
+        )
+        plot_inside_outside_dose_response(
             summary,
-            metric="delta_ivt_outside_mask_mean",
-            ylabel=f"Mean ΔIVT outside AR mask ({time_selection} lead)",
-            out_name=f"dose_response_delta_ivt_outside_mask_mean_{time_selection}.png",
+            out_name=f"dose_response_inside_vs_outside_mask_{time_selection}.png",
             out_dir=out_dir,
+            extra_title=extra_title,
         )
 
     if "delta_precip_inside_mask_mean" in summary.columns:
@@ -622,7 +794,8 @@ def make_all_videos():
             continue
 
         control_file = group[group["gamma"] == CONTROL_GAMMA]["file"].iloc[0]
-        selected_gammas = select_video_gammas(group)
+        #selected_gammas = select_video_gammas(group)
+        selected_gammas = VIDEO_GAMMA_SELECTION
 
         for gamma in selected_gammas:
             if gamma == CONTROL_GAMMA:
@@ -676,8 +849,14 @@ def make_ivt_video(center_time, gamma, forecast_file):
             add_colorbar=False,
         )
 
-        lead = str(ivt.time.values[i])
-        ax.set_title(f"IVT trajectory: gamma={gamma:+.2f}, {center_time}, lead={lead}")
+        lead_hours = int(
+            pd.to_timedelta(ivt.time.values[i]).total_seconds() / 3600
+        )
+
+        ax.set_title(
+            f"IVT trajectory: gamma={gamma:+.2f}, "
+            f"{center_time}, T+{format_lead_time(lead_hours)}"
+        )
         return []
 
     anim = FuncAnimation(fig, update, frames=ivt.sizes["time"], interval=500)
@@ -715,6 +894,86 @@ def make_all_ivt_videos():
                 forecast_file=row["file"],
             )
 
+def plot_global_ivt_trajectories():
+    """
+    Plot the global mean IVT over the forecast trajectory for every gamma.
+
+    Output:
+        evaluation/ivt_trajectories/
+            global_mean_ivt_by_gamma.png
+            global_mean_ivt_by_gamma.csv
+    """
+    out_dir = os.path.join(OUT_DIR, "ivt_trajectories")
+    os.makedirs(out_dir, exist_ok=True)
+
+    file_table = discover_files(INPUT_DIR)
+
+    records = []
+
+    plt.figure(figsize=(8, 5))
+
+    for _, row in file_table.sort_values("gamma").iterrows():
+        gamma = row["gamma"]
+
+        ds = load_prediction(row["file"], time_selection=None)
+        ivt = compute_ivt(ds)
+
+        if "time" not in ivt.dims:
+            print(f"[SKIP] gamma={gamma}: no time dimension")
+            continue
+
+        values = []
+        lead_hours = []
+
+        for t_idx in range(ivt.sizes["time"]):
+
+            ivt_t = ivt.isel(time=t_idx)
+
+            mean_ivt = area_weighted_mean(ivt_t)
+
+            values.append(mean_ivt)
+
+            # GraphCast lead times are stored in nanoseconds
+            lead_h = (
+                pd.to_timedelta(ivt.time.values[t_idx]).total_seconds()
+                / 3600.0
+            )
+            lead_hours.append(lead_h)
+
+            records.append({
+                "gamma": gamma,
+                "lead_hours": lead_h,
+                "global_mean_ivt": mean_ivt,
+                "file": row["file"],
+            })
+
+        plt.plot(
+            lead_hours,
+            values,
+            marker="o",
+            linewidth=2,
+            label=f"γ={gamma:g}",
+        )
+
+    plt.xlabel("Forecast lead time [hours]")
+    plt.ylabel("Global mean IVT")
+    plt.title(f"Global mean IVT trajectory ({CENTER_STR})")
+    plt.grid(True, alpha=0.3)
+    plt.legend(title="Gamma", fontsize=8)
+
+    plt.tight_layout()
+
+    fig_path = os.path.join(out_dir, "global_mean_ivt_by_gamma.png")
+    plt.savefig(fig_path, dpi=300, bbox_inches="tight")
+    plt.close()
+
+    csv_path = os.path.join(out_dir, "global_mean_ivt_by_gamma.csv")
+    pd.DataFrame(records).to_csv(csv_path, index=False)
+
+    print("Saved:", fig_path)
+    print("Saved:", csv_path)
+
+
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -722,6 +981,9 @@ def main():
     for time_selection in TIME_SELECTIONS:
         print(f"\n[EVALUATING {time_selection.upper()} LEAD]\n")
         evaluate_one_step(time_selection)
+
+    print("\n[MAKING GAMMA TRAJECTORY PLOT]\n")
+    plot_global_ivt_trajectories()
 
     if MAKE_TRAJECTORY_VIDEO:
         print("\n[MAKING TRAJECTORY VIDEOS]\n")

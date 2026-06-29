@@ -57,12 +57,12 @@ print("GraphCast signature:", inspect.signature(graphcast.GraphCast))
 GAMMA = [-1.0, -0.5, -0.2, 0.0, 0.2, 0.5, 1.0]
 
 WEATHER_FEATURE = "AR"
-
-MASK_TIME = "2021-01-03T05"
+START_TIME = "2021-01-03T06"
 
 N_DAYS = 5
 
 THRESHOLD = 0.8
+NODE_HIERARCHY_LEVEL = 6
 
 
 def round_to_nearest_6h(t):
@@ -76,12 +76,12 @@ def round_to_nearest_6h(t):
 
 
 PROBE_DIRECTION_PATH = (
-    "/home/student/m/mbraatz/share/graphcast_analysis/plots/malins_experiments/logistic_regression/AR/raw_activations/probe_direction_AR_raw_activations_intersection_M5_512_features_2020_train_only.npz"
+    f"/home/student/m/mbraatz/share/graphcast_analysis/plots/malins_experiments/logistic_regression/{WEATHER_FEATURE}/raw_activations/probe_direction_{WEATHER_FEATURE}_raw_activations_intersection_M{NODE_HIERARCHY_LEVEL}_512_features_2020_train_only.npz"
 )
 
 direction = np.load(PROBE_DIRECTION_PATH)["direction_raw_delta"].astype(np.float32)
 
-center = round_to_nearest_6h(MASK_TIME)
+center = round_to_nearest_6h(START_TIME)
 centers = [np.datetime64(center)]
 
 probe = np.load(PROBE_DIRECTION_PATH)
@@ -101,47 +101,6 @@ data_dir = '/share/prj-4d/graphcast_shared/data/era5_daily_nc'        # contains
 acts_dir = '/share/prj-4d/graphcast_shared/data/graphcast_activation_2021'
 os.makedirs(acts_dir, exist_ok=True)
 
-
-
-
-
-
-
-MASK_DIR = "/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned"
-
-
-def vertices_to_latlon(vertices):
-    lat = np.degrees(np.arcsin(vertices[:, 2]))
-    lon = np.degrees(np.arctan2(vertices[:, 1], vertices[:, 0])) % 360
-    return lat, lon
-
-
-def get_mesh_latlon(splits=6):
-    meshes = icosahedral_mesh.get_hierarchy_of_triangular_meshes_for_sphere(splits=splits)
-    vertices = meshes[splits].vertices
-    return vertices_to_latlon(vertices)
-
-
-def nearest_mask_file(center_time, max_hours=3):
-    mask_files = sorted(glob.glob(os.path.join(MASK_DIR, "*.nc")))
-
-    center_time = pd.Timestamp(str(center_time))
-
-    best_file = None
-    best_diff = None
-
-    for f in mask_files:
-        t = pd.Timestamp(os.path.basename(f).replace(".nc", ""))
-        diff = abs(t - center_time)
-
-        if best_diff is None or diff < best_diff:
-            best_diff = diff
-            best_file = f
-
-    if best_diff > pd.Timedelta(hours=max_hours):
-        return None
-
-    return best_file
 
 
 
@@ -314,12 +273,12 @@ def construct_wrapped_graphcast(model_config, task_config, gamma):
 
     direction_injector = DirectionInjector(
         direction=direction,
-        gamma=gamma,
         scaler_mean=scaler_mean,
         scaler_scale=scaler_scale,
         coef_z=coef_z,
         intercept=intercept,
-        threshold=THRESHOLD,   # or None for soft p_AR weighting everywhere
+        threshold=THRESHOLD,   # or None for soft weighting everywhere
+        gamma = gamma
     )
 
     predictor = graphcast.GraphCast(
@@ -343,10 +302,19 @@ def construct_wrapped_graphcast(model_config, task_config, gamma):
     return predictor
 
 
-@hk.transform_with_state
-def run_forward(model_config, task_config, gamma, inputs, targets_template, forcings):
-    predictor = construct_wrapped_graphcast(model_config, task_config, gamma)
-    return predictor(inputs, targets_template=targets_template, forcings=forcings)
+def make_run_forward_jitted(gamma):
+    @hk.transform_with_state
+    def run_forward_gamma(model_config, task_config, inputs, targets_template, forcings):
+        predictor = construct_wrapped_graphcast(model_config, task_config, gamma)
+        return predictor(inputs, targets_template=targets_template, forcings=forcings)
+
+    return drop_state(
+        with_params(
+            jax.jit(with_configs(run_forward_gamma.apply))
+        )
+    )
+
+
 
 
 def with_configs(fn):
@@ -404,22 +372,7 @@ for gamma in GAMMA:
             **dataclasses.asdict(task_config),
         )
 
-        mask_path = nearest_mask_file(center_str, max_hours=3)
-
-        if mask_path is None:
-            print(f"[NO AR MASK] {center_str}")
-            continue
-
-
-
-        run_forward_jitted = drop_state(
-            with_params(
-                jax.jit(with_configs(run_forward.apply,  gamma=gamma,))
-            )
-        )
-
-        print("Using AR mask:", mask_path)
-
+        run_forward_jitted = make_run_forward_jitted(gamma)
         
         print("inputs time:", inputs.time.values)
         print("targets time:", targets.time.values)
@@ -443,6 +396,7 @@ for gamma in GAMMA:
             "malins_experiments",
             "pertubation_experiments",
             WEATHER_FEATURE,
+            f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}",
             f"pertubation_threshold_{THRESHOLD}",
             center_str,         
             "data",

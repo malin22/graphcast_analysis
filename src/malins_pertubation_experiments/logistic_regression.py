@@ -26,9 +26,9 @@ from graphcast import icosahedral_mesh
 # CONFIG
 # =====================
 
-WEATHER_FEATURE = "AR"  # "AR" or "TC"
-REPRESENTATION = "raw_activations"  # "raw_activations" or "PCA"
-NODE_HIERARCHY_LEVEL = 5
+WEATHER_FEATURE = "TC"  # "AR" or "TC"
+REPRESENTATION = "PCA"  # "raw_activations" or "PCA"
+NODE_HIERARCHY_LEVEL = 6
 
 FEATURE_COUNTS_RAW = [512]
 PC_COUNTS = [5, 10, 25, 50, 100, 200, 400]
