@@ -15,9 +15,10 @@ from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
 # CONFIG
 # =====================
 
-THRESHOLD = 0.8
-CENTER_STR = "2021-01-03T06"
-NODE_HIERARCHY_LEVEL = 5
+WEATHER_FEATURE = "AR"
+THRESHOLD = 0.9
+CENTER_STR = "2021-02-12T18"
+NODE_HIERARCHY_LEVEL = 6
 
 # Only generate videos for the lowest, highest, and control gamma values.
 VIDEO_GAMMA_SELECTION = [-0.5, 0.5]
@@ -26,7 +27,7 @@ BASE_DIR = os.path.join(
     "plots",
     "malins_experiments",
     "pertubation_experiments",
-    "AR",
+    WEATHER_FEATURE,
     f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}",
     f"pertubation_threshold_{THRESHOLD}",
     CENTER_STR,
@@ -36,7 +37,6 @@ INPUT_DIR = os.path.join(BASE_DIR, "data")
 OUT_DIR = os.path.join(BASE_DIR, "evaluation")
 MASK_DIR = "/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned"
 
-USE_MASK = True
 CONTROL_GAMMA = 0.0
 MAX_MASK_TIME_DIFFERENCE_HOURS = 3
 
@@ -188,6 +188,24 @@ def compute_ivt(ds):
     ivt = np.sqrt(ivt_u**2 + ivt_v**2)
     return xr.DataArray(ivt, dims=dims, coords=coords, name="ivt")
 
+
+def compute_10m_wind(ds):
+    u = ds["10m_u_component_of_wind"]
+    v = ds["10m_v_component_of_wind"]
+    wind = np.hypot(u, v)
+    wind.name = "wind10"
+    return wind
+
+
+def get_mslp(ds):
+    mslp = ds["mean_sea_level_pressure"]
+
+    # Pa -> hPa
+    if float(mslp.max()) > 2000:
+        mslp = mslp / 100.0
+
+    mslp.name = "mslp"
+    return mslp
 
 def get_lat_name(da):
     if "lat" in da.coords:
@@ -459,6 +477,41 @@ def plot_delta_map(delta_da, gamma, center_time, out_name, out_dir, lead_label=N
     plt.close()
     print("Saved:", out_path)
 
+
+def plot_delta_wind10_map(delta_wind10, gamma, center_time, out_name, out_dir, lead_label=None):
+    lat_name = get_lat_name(delta_wind10)
+    lon_name = get_lon_name(delta_wind10)
+
+    values = delta_wind10.values
+    vmax = np.nanpercentile(np.abs(values), 99)
+
+    if not np.isfinite(vmax) or vmax == 0:
+        vmax = np.nanmax(np.abs(values))
+
+    plt.figure(figsize=(10, 4.8))
+
+    delta_wind10.plot(
+        x=lon_name,
+        y=lat_name,
+        cmap="RdBu_r",
+        vmin=-vmax,
+        vmax=vmax,
+        cbar_kwargs={"label": "Δ10 m wind speed [m/s]"},
+    )
+
+    title = f"Δ10 m wind: gamma={gamma:+.2f} minus gamma=0, {center_time}"
+    if lead_label is not None:
+        title += f", {lead_label}"
+
+    plt.title(title)
+    plt.tight_layout()
+
+    out_path = os.path.join(out_dir, out_name)
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
+    plt.close()
+
+    print("Saved:", out_path)
+
 def plot_ivt_map(ivt, gamma, center_time, out_name, out_dir):
     plt.figure(figsize=(10, 4.8))
 
@@ -556,7 +609,7 @@ def make_delta_ivt_video(center_time, gamma, control_file, perturbed_file):
 # EVALUATION
 # =====================
 
-def evaluate_one_step(time_selection):
+def evaluate_ar(time_selection):
     file_table = discover_files(INPUT_DIR)
 
     datasets = {}
@@ -596,52 +649,50 @@ def evaluate_one_step(time_selection):
         ar_mask = None
         mask_path = None
 
-        if USE_MASK:
-            try:
-                if time_selection == "first":
-                    time_index = 0
-                elif time_selection == "last":
-                    time_index = -1
-                else:
-                    raise ValueError(time_selection)
+        try:
+            if time_selection == "first":
+                time_index = 0
+            elif time_selection == "last":
+                time_index = -1
 
-                control_ds_full = load_prediction(
-                    file_table[file_table["gamma"] == CONTROL_GAMMA]["file"].iloc[0],
-                    time_selection=None,
-                )
 
-                search_direction = 1 if time_selection == "first" else -1
+            control_ds_full = load_prediction(
+                file_table[file_table["gamma"] == CONTROL_GAMMA]["file"].iloc[0],
+                time_selection=None,
+            )
 
-                matched_time_index, valid_time, mask_path, mask_time, mask_diff_h = find_next_timestep_with_mask(
-                    control_ds_full,
-                    time_index,
-                    direction=search_direction,
-                )
+            search_direction = 1 if time_selection == "first" else -1
 
-                if matched_time_index is None:
-                    raise ValueError(f"No usable mask found for {time_selection} lead.")
+            matched_time_index, valid_time, mask_path, mask_time, mask_diff_h = find_next_timestep_with_mask(
+                control_ds_full,
+                time_index,
+                direction=search_direction,
+            )
 
-                # Reload prediction at the matched timestep, not necessarily first/last anymore
-                for _, row in file_table.iterrows():
-                    key = (row["center_time"], row["gamma"])
-                    ds_full = load_prediction(row["file"], time_selection=None)
-                    ds_step = ds_full.isel(time=matched_time_index)
-                    datasets[key] = ds_step
-                    ivts[key] = compute_ivt(ds_step)
+            if matched_time_index is None:
+                raise ValueError(f"No usable mask found for {time_selection} lead.")
 
-                control_ivt = ivts[control_key]
+            # Reload prediction at the matched timestep, not necessarily first/last anymore
+            for _, row in file_table.iterrows():
+                key = (row["center_time"], row["gamma"])
+                ds_full = load_prediction(row["file"], time_selection=None)
+                ds_step = ds_full.isel(time=matched_time_index)
+                datasets[key] = ds_step
+                ivts[key] = compute_ivt(ds_step)
 
-                ar_mask, mask_path, mask_time, mask_diff_h = load_mask_on_grid(
-                    valid_time,
-                    control_ivt,
-                )
+            control_ivt = ivts[control_key]
 
-                print(
-                    f"Using forecast step {matched_time_index}: valid={valid_time}, "
-                    f"mask={mask_time}, diff={mask_diff_h:.1f} h"
-                )
-            except Exception as e:
-                print(f"[WARN] Could not load mask for {center_time}: {e}")
+            ar_mask, mask_path, mask_time, mask_diff_h = load_mask_on_grid(
+                valid_time,
+                control_ivt,
+            )
+
+            print(
+                f"Using forecast step {matched_time_index}: valid={valid_time}, "
+                f"mask={mask_time}, diff={mask_diff_h:.1f} h"
+            )
+        except Exception as e:
+            print(f"[WARN] Could not load mask for {center_time}: {e}")
 
         for gamma in available_gammas:
             key = (center_time, gamma)
@@ -765,6 +816,202 @@ def evaluate_one_step(time_selection):
         )
 
 
+def evaluate_tc(time_selection):
+    file_table = discover_files(INPUT_DIR)
+
+    if time_selection == "first":
+        time_index = 0
+    elif time_selection == "last":
+        time_index = -1
+    else:
+        raise ValueError(time_selection)
+
+    out_dir = os.path.join(OUT_DIR, f"lead_{time_selection}")
+    os.makedirs(out_dir, exist_ok=True)
+
+    records = []
+
+    for center_time in sorted(file_table["center_time"].unique()):
+        center_time = pd.Timestamp(center_time)
+
+        group = file_table[file_table["center_time"] == center_time]
+        available_gammas = sorted(group["gamma"].unique())
+
+        control_file = group[group["gamma"] == CONTROL_GAMMA]["file"].iloc[0]
+        control_full = load_prediction(control_file, time_selection=None)
+
+        matched_time_index = (
+            0 if time_selection == "first"
+            else control_full.sizes["time"] - 1
+        )
+
+        valid_time = get_valid_time(control_full, matched_time_index)
+
+        lead_hours = int((valid_time - center_time) / pd.Timedelta(hours=1))
+        lead_label = f"T+{format_lead_time(lead_hours)}"
+        control_ds = control_full.isel(time=time_index)
+        control_wind10 = compute_10m_wind(control_ds)
+        control_mslp = get_mslp(control_ds)
+
+        control_max_wind = max_value(control_wind10)
+        control_min_mslp = float(control_mslp.min(skipna=True).values)
+
+        for gamma in available_gammas:
+            forecast_file = group[group["gamma"] == gamma]["file"].iloc[0]
+
+            ds_full = load_prediction(forecast_file, time_selection=None)
+            ds = ds_full.isel(time=time_index)
+
+            wind10 = compute_10m_wind(ds)
+            mslp = get_mslp(ds)
+
+            max_wind = max_value(wind10)
+            min_mslp = float(mslp.min(skipna=True).values)
+
+            records.append({
+                "time_selection": time_selection,
+                "center_time": str(center_time),
+                "gamma": gamma,
+                "matched_time_index": matched_time_index,
+                "forecast_valid_time": str(valid_time),
+                "file": forecast_file,
+                "max_10m_wind": max_wind,
+                "min_mslp_hpa": min_mslp,
+                "delta_max_10m_wind": max_wind - control_max_wind,
+                "delta_min_mslp_hpa": min_mslp - control_min_mslp,
+            })
+
+            if gamma != CONTROL_GAMMA:
+                delta_wind10 = wind10 - control_wind10
+
+                safe_time = str(center_time).replace(":", "").replace(" ", "T")
+                out_name = (
+                    f"delta_wind10_{time_selection}_"
+                    f"gamma_{gamma:+.2f}_{safe_time}.png"
+                )
+
+                plot_delta_wind10_map(
+                    delta_wind10,
+                    gamma,
+                    center_time,
+                    out_name,
+                    out_dir,
+                    lead_label=lead_label,
+                )
+
+    summary = pd.DataFrame(records).sort_values(["center_time", "gamma"])
+
+    summary_path = os.path.join(
+        out_dir,
+        f"gamma_summary_metrics_{time_selection}.csv",
+    )
+    summary.to_csv(summary_path, index=False)
+    print("Saved:", summary_path)
+    print(summary)
+
+    plot_dose_response(
+        summary,
+        metric="delta_max_10m_wind",
+        ylabel=f"Δ maximum 10 m wind [m/s] ({time_selection} lead)",
+        out_name=f"dose_response_delta_max_10m_wind_{time_selection}.png",
+        out_dir=out_dir,
+    )
+
+    plot_dose_response(
+        summary,
+        metric="delta_min_mslp_hpa",
+        ylabel=f"Δ minimum MSLP [hPa] ({time_selection} lead)",
+        out_name=f"dose_response_delta_min_mslp_{time_selection}.png",
+        out_dir=out_dir,
+    )
+
+
+def plot_tc_intensity_trajectories():
+    out_dir = os.path.join(OUT_DIR, "tc_intensity_trajectories")
+    os.makedirs(out_dir, exist_ok=True)
+
+    file_table = discover_files(INPUT_DIR)
+    records = []
+
+    plt.figure(figsize=(8, 5))
+
+    for _, row in file_table.sort_values("gamma").iterrows():
+        gamma = row["gamma"]
+        ds = load_prediction(row["file"], time_selection=None)
+
+        wind10 = compute_10m_wind(ds)
+        mslp = get_mslp(ds)
+
+        lead_hours = []
+        max_winds = []
+        min_mslps = []
+
+        for t_idx in range(ds.sizes["time"]):
+            lead_h = pd.to_timedelta(ds.time.values[t_idx]).total_seconds() / 3600.0
+
+            wind_t = wind10.isel(time=t_idx)
+            mslp_t = mslp.isel(time=t_idx)
+
+            max_wind = float(wind_t.max(skipna=True).values)
+            min_mslp = float(mslp_t.min(skipna=True).values)
+
+            lead_hours.append(lead_h)
+            max_winds.append(max_wind)
+            min_mslps.append(min_mslp)
+
+            records.append({
+                "gamma": gamma,
+                "lead_hours": lead_h,
+                "lead_label": format_lead_time(lead_h),
+                "forecast_valid_time": str(get_valid_time(ds, t_idx)),
+                "max_10m_wind": max_wind,
+                "min_mslp_hpa": min_mslp,
+                "file": row["file"],
+            })
+
+        plt.plot(lead_hours, max_winds, marker="o", linewidth=2, label=f"γ={gamma:g}")
+
+    plt.xlabel("Forecast lead time [hours]")
+    plt.ylabel("Maximum 10 m wind [m/s]")
+    plt.title(f"TC max 10 m wind trajectory ({CENTER_STR})")
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=8)
+    plt.tight_layout()
+
+    wind_path = os.path.join(out_dir, "max_10m_wind_by_gamma.png")
+    plt.savefig(wind_path, dpi=300, bbox_inches="tight")
+    plt.close()
+    print("Saved:", wind_path)
+
+    df = pd.DataFrame(records)
+    csv_path = os.path.join(out_dir, "tc_intensity_trajectory_metrics.csv")
+    df.to_csv(csv_path, index=False)
+    print("Saved:", csv_path)
+
+    plt.figure(figsize=(8, 5))
+
+    for gamma, group in df.groupby("gamma"):
+        group = group.sort_values("lead_hours")
+        plt.plot(
+            group["lead_hours"],
+            group["min_mslp_hpa"],
+            marker="o",
+            linewidth=2,
+            label=f"γ={gamma:g}",
+        )
+
+    plt.xlabel("Forecast lead time [hours]")
+    plt.ylabel("Minimum MSLP [hPa]")
+    plt.title(f"TC minimum MSLP trajectory ({CENTER_STR})")
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=8)
+    plt.tight_layout()
+
+    mslp_path = os.path.join(out_dir, "min_mslp_by_gamma.png")
+    plt.savefig(mslp_path, dpi=300, bbox_inches="tight")
+    plt.close()
+    print("Saved:", mslp_path)
+
 def select_video_gammas(group):
     if VIDEO_GAMMA_SELECTION != "extremes_and_control":
         return sorted(group["gamma"].unique())
@@ -780,7 +1027,6 @@ def select_video_gammas(group):
         selected.append(available[-1])  # highest
 
     return sorted(set(selected))
-
 
 def make_all_videos():
     file_table = discover_files(INPUT_DIR)
@@ -979,18 +1225,27 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
 
     for time_selection in TIME_SELECTIONS:
-        print(f"\n[EVALUATING {time_selection.upper()} LEAD]\n")
-        evaluate_one_step(time_selection)
+        if WEATHER_FEATURE == "AR":
+            evaluate_ar(time_selection)
+        elif WEATHER_FEATURE == "TC":
+            evaluate_tc(time_selection)
 
-    print("\n[MAKING GAMMA TRAJECTORY PLOT]\n")
-    plot_global_ivt_trajectories()
 
-    if MAKE_TRAJECTORY_VIDEO:
-        print("\n[MAKING TRAJECTORY VIDEOS]\n")
-        make_all_videos()
+    if WEATHER_FEATURE == "AR":
+        print("\n[MAKING GAMMA TRAJECTORY PLOT]\n")
+        plot_global_ivt_trajectories()
 
-        print("\n[MAKING IVT TRAJECTORY VIDEOS]\n")
-        make_all_ivt_videos()
+        if MAKE_TRAJECTORY_VIDEO:
+            print("\n[MAKING TRAJECTORY VIDEOS]\n")
+            make_all_videos()
+
+            print("\n[MAKING IVT TRAJECTORY VIDEOS]\n")
+            make_all_ivt_videos()
+
+
+    if WEATHER_FEATURE == "TC":
+        print("\n[MAKING TC INTENSITY TRAJECTORY PLOTS]\n")
+        plot_tc_intensity_trajectories()
 
     print("[DONE]")
 

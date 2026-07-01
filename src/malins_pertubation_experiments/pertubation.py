@@ -57,11 +57,11 @@ print("GraphCast signature:", inspect.signature(graphcast.GraphCast))
 GAMMA = [-1.0, -0.5, -0.2, 0.0, 0.2, 0.5, 1.0]
 
 WEATHER_FEATURE = "AR"
-START_TIME = "2021-01-03T06"
+START_TIME = "2021-02-12T18"
 
 N_DAYS = 5
 
-THRESHOLD = 0.8
+THRESHOLD = 0.9
 NODE_HIERARCHY_LEVEL = 6
 
 

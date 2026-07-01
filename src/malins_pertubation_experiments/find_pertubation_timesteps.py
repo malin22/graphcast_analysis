@@ -5,7 +5,7 @@ import glob
 import pandas as pd
 
 
-WEATHER_FEATURE = "TC"
+WEATHER_FEATURE = "AR"
 MASK_DIR = f"/share/prj-4d/graphcast_shared/data/ClimateNetLarge/{WEATHER_FEATURE}_labels_cleaned"
 
 START_DATE = "2021-01-01"
@@ -67,7 +67,7 @@ def main():
         check_times = {
             "start": center_time + pd.Timedelta(hours=6),
             #"middle": center_time + pd.Timedelta(days=FORECAST_DAYS / 2) + pd.Timedelta(hours=6),
-            "end": center_time + pd.Timedelta(days=FORECAST_DAYS) + pd.Timedelta(hours=6),
+            "end": center_time + pd.Timedelta(days=FORECAST_DAYS) #+ pd.Timedelta(hours=6),
         }
 
         matches = {

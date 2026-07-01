@@ -26,7 +26,7 @@ from graphcast import icosahedral_mesh
 # CONFIG
 # =====================
 
-WEATHER_FEATURE = "TC"  # "AR" or "TC"
+WEATHER_FEATURE = "AR"  # "AR" or "TC"
 REPRESENTATION = "PCA"  # "raw_activations" or "PCA"
 NODE_HIERARCHY_LEVEL = 6
 
