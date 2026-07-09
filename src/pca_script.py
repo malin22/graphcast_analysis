@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import IncrementalPCA
 from graphcast import icosahedral_mesh
 
+from collections import Counter
+import re
+
 
 def load_activations(path: str) -> np.ndarray:
     """Load activation file, handling dtype conversions."""
@@ -139,7 +142,7 @@ def plot_cumulative_explained_variance(ipca, out_dir, max_components=None):
     plt.ylim(0, 1.01)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, "pca_cumulative_explained_variance_2020.png"), dpi=300, bbox_inches="tight")
+    plt.savefig(os.path.join(out_dir, "pca_cumulative_explained_variance_2021_Jan_all_layers.png"), dpi=300, bbox_inches="tight")
     plt.close()
 
 def run_pca(
@@ -160,7 +163,7 @@ def run_pca(
     os.makedirs(out_dir, exist_ok=True)
 
     # Find all .npy files
-    pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t*.npy"
+    pattern = "layer*_mesh_gnn_post_res_nodes_mesh_nodes_t*.npy"
     npy_files = sorted(glob(os.path.join(acts_dir, pattern)))
     #npy_files = sorted(glob(os.path.join(acts_dir, "*.npy")))
 
@@ -168,6 +171,38 @@ def run_pca(
         raise FileNotFoundError(f"No .npy files found in {acts_dir}")
 
     print(f"Found {len(npy_files)} activation files")
+
+
+    time_counts = Counter()
+    layer_counts = Counter()
+
+    pat = re.compile(r"layer(\d+)_mesh_gnn_post_res_nodes_mesh_nodes_t(.+)\.npy")
+
+    for f in npy_files:
+        name = os.path.basename(f)
+        m = pat.match(name)
+        if not m:
+            print("No regex match:", name)
+            continue
+
+        layer = int(m.group(1))
+        timestamp = m.group(2)
+
+        layer_counts[layer] += 1
+        time_counts[timestamp] += 1
+
+    print("\nFiles per layer:")
+    for layer, count in sorted(layer_counts.items()):
+        print(f"layer{layer:04d}: {count}")
+
+    print("\nTimestamps with incomplete layer coverage:")
+    for timestamp, count in sorted(time_counts.items()):
+        if count != 16:
+            print(timestamp, count)
+
+    print("\nAll timestamps found:")
+    for timestamp, count in sorted(time_counts.items()):
+        print(timestamp, count)
 
     # Fit incremental PCA
     ipca = IncrementalPCA(n_components=n_components)
@@ -215,8 +250,8 @@ def run_pca(
     print(f"PCA mean vector shape: {ipca.mean_.shape}")
 
     # Save PCA basis for later reuse
-    np.save(os.path.join(out_dir, "pca_components_2020.npy"), ipca.components_)
-    np.save(os.path.join(out_dir, "pca_mean_2020.npy"), ipca.mean_)
+    np.save(os.path.join(out_dir, "pca_components_2021_Jan_all_layers.npy"), ipca.components_)
+    np.save(os.path.join(out_dir, "pca_mean_2021_Jan_all_layers.npy"), ipca.mean_)
     print(f"Saved PCA basis to {out_dir}/")
 
     # Plot cumulative explained variance
@@ -232,26 +267,24 @@ def run_pca(
     return ipca
 
 if __name__ == "__main__":
-    ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2020"
+    ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activations_2021"
     PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components"
-    PLOTS_OUT    = "plots/2020_pca_projected_on_2020"
+    PLOTS_OUT    = "plots/2021_projected_on_2021"
 
-    ipca = run_pca(
-        acts_dir=ACTS_DIR,
-        n_components=400,
-        batch_size=10,
-        out_dir=PCA_DIR,
+    # ipca = run_pca(
+    #     acts_dir=ACTS_DIR,
+    #     n_components=400,
+    #     batch_size=10,
+    #     out_dir=PCA_DIR,
   
-    )
-
-    plot_cumulative_explained_variance()
+    # )
     
 
-    # plot_yearly_mean_pcs(
-    #     acts_dir=ACTS_DIR,
-    #     pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2020.npy',
-    #     pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2020.npy',
-    #     out_dir="plots/2020_pca_projected_on_2020_20pcs",
-    #     n_top_pcs=20,
-    #     scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
-    # )
+    plot_yearly_mean_pcs(
+        acts_dir=ACTS_DIR,
+        pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2020.npy',
+        pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2020.npy',
+        out_dir="plots/2020_pca_projected_on_2020_20pcs",
+        n_top_pcs=20,
+        scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
+    )

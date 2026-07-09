@@ -11,11 +11,11 @@ import numpy as np
 from graphcast import icosahedral_mesh
 
 
-ACTS_DIR = Path("/share/prj-4d/graphcast_shared/data/graphcast_activations_all_layers_1week_January_2021")
-OUT_DIR = Path("/home/student/s/sascholle/share/graphcast_analysis/plots/sabines_experiments/layer_analysis")
+ACTS_DIR = Path("/share/prj-4d/graphcast_shared/data/graphcast_activations_all_layers_January_2021")
+OUT_DIR = Path("/home/student/s/sascholle/share/graphcast_analysis/plots/sabines_experiments/layer_analysis/AllLayersJanuaryPCs")
 
-PCA_COMPONENTS_PATH = Path("/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021.npy")
-PCA_MEAN_PATH = Path("/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021.npy")
+PCA_COMPONENTS_PATH = Path("/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021_Jan_all_layers.npy")
+PCA_MEAN_PATH = Path("/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021_Jan_all_layers.npy")
 
 
 def to_float32(x):
@@ -201,7 +201,7 @@ def main():
     parser = argparse.ArgumentParser(description="Animate PC maps across GraphCast layers.")
     parser.add_argument("--acts-dir", type=Path, default=ACTS_DIR)
     parser.add_argument("--out-dir", type=Path, default=OUT_DIR)
-    parser.add_argument("--pc-indices", type=int, nargs="+", default=[0, 1, 2, 3, 4])
+    parser.add_argument("--pc-indices", type=int, nargs="+", default=[5, 6, 7, 8, 9, 10])
     parser.add_argument("--layers", type=int, nargs="+", default=list(range(16)))
     parser.add_argument("--animation-format", choices=["gif", "mp4"], default="gif")
     args = parser.parse_args()
@@ -223,15 +223,15 @@ def main():
     )
 
     np.save(
-        args.out_dir / "1weekjanuary2021_layer_mean_pc_maps.npy",
+        args.out_dir / "january2021_layer_mean_pc_maps.npy",
         layer_maps,
     )
     np.save(
-        args.out_dir / "1weekjanuary2021_layer_indices.npy",
+        args.out_dir / "january2021_layer_indices.npy",
         np.asarray(args.layers, dtype=np.int32),
     )
     np.save(
-        args.out_dir / "1weekjanuary2021_pc_indices.npy",
+        args.out_dir / "january2021_pc_indices.npy",
         pc_indices,
     )
 
