@@ -26,7 +26,7 @@ from graphcast import icosahedral_mesh
 # CONFIG
 # =====================
 
-WEATHER_FEATURE = "AR"  # "AR" or "TC"
+WEATHER_FEATURE = "TC"  # "AR" or "TC"
 REPRESENTATION = "PCA"  # "raw_activations" or "PCA"
 NODE_HIERARCHY_LEVEL = 6
 
@@ -201,14 +201,32 @@ def get_coarse_mesh_node_indices(fine_splits=6, coarse_splits=4, decimals=8):
     return np.array(coarse_indices, dtype=int)
 
 
-def nearest_graphcast_index(mask_time, graphcast_times, max_hours=3):
-    diffs = np.abs(graphcast_times - mask_time)
-    idx = int(np.argmin(diffs))
+def nearest_graphcast_row(mask_time, graphcast_df, max_hours=3):
+    diffs = np.abs(graphcast_df["time"] - mask_time)
+    idx = int(diffs.argmin())
 
-    if diffs[idx] > pd.Timedelta(hours=max_hours):
+    if diffs.iloc[idx] > pd.Timedelta(hours=max_hours):
         return None
 
-    return idx
+    return graphcast_df.iloc[idx]
+
+def build_X_for_split(
+    matched_df,
+    split_mask_events,
+    pc_scores_by_year,
+    all_nodes,
+    n_features,
+):
+    X_parts = []
+
+    for _, row in matched_df.loc[split_mask_events].iterrows():
+        year = int(row["year"])
+        t_idx = int(row["t_idx"])
+
+        X_t = pc_scores_by_year[year][t_idx, all_nodes, :n_features]
+        X_parts.append(np.asarray(X_t, dtype=np.float32))
+
+    return np.concatenate(X_parts, axis=0)
 
 
 def load_mask_at_nodes(mask_path, lat, lon, node_indices, label_mode="intersection"):
@@ -291,45 +309,42 @@ def load_raw_activation_years(acts_dirs):
     return act_files, graphcast_times, max_features
 
 
-def load_pca_years(pc_score_paths, timestep_files_txts, all_nodes, samples_per_t):
-    """Load PCA scores from several years and return flattened X plus timestamps."""
-    X_parts = []
-    time_parts = []
+def load_pca_metadata(pc_score_paths, timestep_files_txts):
+    pc_scores_by_year = {}
+    timestamps_by_year = {}
     max_features = None
 
     for year in sorted(pc_score_paths):
-        pc_scores_path = pc_score_paths[year]
-        timestep_files_txt = timestep_files_txts[year]
+        pc_scores = np.load(pc_score_paths[year], mmap_mode="r")
+        _, timestamps = load_timestamps(timestep_files_txts[year])
 
-        _, timestamps = load_timestamps(timestep_files_txt)
-        pc_scores = np.load(pc_scores_path, mmap_mode="r")
         T, N, K = pc_scores.shape
-
         if len(timestamps) != T:
             raise ValueError(f"{len(timestamps)} timestamps but {T} PC-score timesteps for {year}")
 
-        year_max_features = min(max(PC_COUNTS), K)
-        if max_features is None:
-            max_features = year_max_features
-        else:
-            max_features = min(max_features, year_max_features)
+        pc_scores_by_year[year] = pc_scores
+        timestamps_by_year[year] = pd.to_datetime(timestamps)
 
-        X_year = np.asarray(pc_scores[:, all_nodes, :max_features], dtype=np.float32)
-        X_parts.append(X_year)
-        time_parts.append(pd.to_datetime(timestamps))
+        max_features = K if max_features is None else min(max_features, K)
 
         print(f"PC scores {year}:", pc_scores.shape)
 
-    X_all = np.concatenate(X_parts, axis=0)
-    graphcast_times = pd.to_datetime(np.concatenate([t.values for t in time_parts]))
-    order = np.argsort(graphcast_times.values)
-    X_all = X_all[order]
-    graphcast_times = graphcast_times[order]
+    max_features = min(max_features, max(PC_COUNTS))
+    return pc_scores_by_year, timestamps_by_year, max_features
 
-    X_all = X_all.reshape(len(graphcast_times) * samples_per_t, max_features)
-    print("Combined PC-score matrix:", X_all.shape)
-    print("Using max PCs:", max_features)
-    return X_all, graphcast_times, max_features
+def build_graphcast_time_table(timestamps_by_year):
+    rows = []
+
+    for year, times in timestamps_by_year.items():
+        for t_idx, t in enumerate(times):
+            rows.append({
+                "year": year,
+                "t_idx": t_idx,
+                "time": t,
+            })
+
+    df = pd.DataFrame(rows).sort_values("time").reset_index(drop=True)
+    return df
 
 
 def split_name_masks(time_index, valid):
@@ -347,9 +362,7 @@ def evaluate_split(model, X_split, y_split, split_name, threshold=0.5):
 # =====================
 # MAIN
 # =====================
-
 def main():
-
     lat, lon = get_mesh_latlon(splits=6)
 
     coarse_nodes = get_coarse_mesh_node_indices(
@@ -363,46 +376,47 @@ def main():
     print("Nodes per timestep:", samples_per_t)
     print(f"Using M{NODE_HIERARCHY_LEVEL} mesh nodes")
 
-    if REPRESENTATION == "raw_activations":
-        act_files, graphcast_times, max_features = load_raw_activation_years(ACTS_DIRS)
-        X_all = None
-        feature_counts = FEATURE_COUNTS_RAW
-
-    elif REPRESENTATION == "PCA":
-        X_all, graphcast_times, max_features = load_pca_years(
-            PC_SCORES_PATHS,
-            TIMESTEP_FILES_TXTS,
-            all_nodes,
-            samples_per_t,
+    if REPRESENTATION != "PCA":
+        raise NotImplementedError(
+            "This memory-efficient main is currently written for REPRESENTATION='PCA'."
         )
-        feature_counts = PC_COUNTS
 
-    else:
-        raise ValueError(f"Unknown REPRESENTATION: {REPRESENTATION}")
+    # ---------------------
+    # Load PCA files as memory maps only
+    # ---------------------
+    pc_scores_by_year, timestamps_by_year, max_features = load_pca_metadata(
+        PC_SCORES_PATHS,
+        TIMESTEP_FILES_TXTS,
+    )
 
-
-
-    
+    graphcast_df = build_graphcast_time_table(timestamps_by_year)
+    feature_counts = PC_COUNTS
 
     mask_files = sorted(glob(os.path.join(MASK_DIR, "*.nc")))
 
     y_parts = []
-    x_parts = []
+    event_parts = []
     matched_rows = []
 
-    event_parts = []
-
+    # ---------------------
+    # Match masks to GraphCast times
+    # but do NOT build X yet
+    # ---------------------
     for i, mask_path in enumerate(mask_files):
         mask_time = parse_mask_timestamp(mask_path)
-        t_idx = nearest_graphcast_index(
+
+        row = nearest_graphcast_row(
             mask_time,
-            graphcast_times,
+            graphcast_df,
             max_hours=MAX_TIME_DIFFERENCE_HOURS,
         )
 
-        if t_idx is None:
+        if row is None:
             continue
 
+        year = int(row["year"])
+        t_idx = int(row["t_idx"])
+        graphcast_time = row["time"]
 
         y_nodes = load_mask_at_nodes(
             mask_path,
@@ -415,28 +429,18 @@ def main():
         if LABEL_MODE != "soft":
             y_nodes = (y_nodes > 0).astype(np.int8)
 
-        if REPRESENTATION == "raw_activations":
-            X_t_full = load_activations(act_files[t_idx])
-            X_t = X_t_full[all_nodes, :max_features]
-        else:
-            start = t_idx * samples_per_t
-            end = (t_idx + 1) * samples_per_t
-            X_t = X_all[start:end, :max_features]
-
-        y_parts.append(y_nodes)
-        x_parts.append(X_t)
-
         event_idx = len(matched_rows)
 
-        event_parts.append(
-            np.full(samples_per_t, event_idx, dtype=np.int32)
-        )
+        y_parts.append(y_nodes)
+        event_parts.append(np.full(samples_per_t, event_idx, dtype=np.int32))
 
         matched_rows.append({
             "mask_file": os.path.basename(mask_path),
             "mask_time": mask_time,
-            "graphcast_time": graphcast_times[t_idx],
-            "time_difference_hours": abs(graphcast_times[t_idx] - mask_time).total_seconds() / 3600,
+            "graphcast_time": graphcast_time,
+            "year": year,
+            "t_idx": t_idx,
+            "time_difference_hours": abs(graphcast_time - mask_time).total_seconds() / 3600,
             "positive_nodes": int(np.sum(y_nodes > 0)),
             "positive_fraction": float(np.mean(y_nodes > 0)),
         })
@@ -447,53 +451,75 @@ def main():
     if not y_parts:
         raise ValueError(f"No {WEATHER_FEATURE} mask files matched GraphCast timestamps.")
 
-    X = np.concatenate(x_parts, axis=0)
-    y = np.concatenate(y_parts, axis=0).astype(np.int8)
-    event_id = np.concatenate(event_parts)
-
     matched_df = pd.DataFrame(matched_rows)
     matched_df.to_csv(os.path.join(OUT_DIR, "matched_files.csv"), index=False)
 
+    y = np.concatenate(y_parts, axis=0).astype(np.int8)
+    event_id = np.concatenate(event_parts)
+
     matched_times = pd.to_datetime(matched_df["graphcast_time"].values)
-    time_index = np.repeat(matched_times.values, samples_per_t)
-    time_index = pd.to_datetime(time_index)
 
-    valid_X = np.all(np.isfinite(X), axis=1)
-    valid_y = np.isfinite(y)
-    valid = valid_X & valid_y
+    event_train_mask = (matched_times >= TRAIN_START) & (matched_times < TRAIN_END)
+    event_test_mask = (matched_times >= TEST_START) & (matched_times < TEST_END)
 
-    train_mask, test_mask = split_name_masks(time_index, valid)
+    train_mask = np.repeat(event_train_mask, samples_per_t)
+    test_mask = np.repeat(event_test_mask, samples_per_t)
+
+    y_train_all = y[train_mask]
+    y_test_all = y[test_mask]
 
     print(f"Matched {WEATHER_FEATURE} files:", len(matched_df))
-    print("X shape:", X.shape)
     print("y shape:", y.shape)
     print("Overall positive rate:", np.mean(y))
     print(f"Train window: {TRAIN_START.date()} to {TRAIN_END.date()} exclusive")
     print(f"Held-out test window: {TEST_START.date()} to {TEST_END.date()} exclusive")
     print("Train samples:", train_mask.sum())
     print("Test samples:", test_mask.sum())
-    print("Train positives:", y[train_mask].sum())
-    print("Test positives:", y[test_mask].sum())
+    print("Train positives:", y_train_all.sum())
+    print("Test positives:", y_test_all.sum())
 
     results = []
 
     for n_features in feature_counts:
-
-
-        if n_features > X.shape[1]:
-            print(f"Skipping {n_features}: only {X.shape[1]} features available")
+        if n_features > max_features:
+            print(f"Skipping {n_features}: only {max_features} features available")
             continue
 
-        X_train = X[train_mask, :n_features]
-        X_test = X[test_mask, :n_features]
+        print(f"\nBuilding train/test matrices for {n_features} features...")
 
-        y_train = y[train_mask]
-        y_test = y[test_mask]
+        X_train = build_X_for_split(
+            matched_df,
+            event_train_mask,
+            pc_scores_by_year,
+            all_nodes,
+            n_features,
+        )
+
+        X_test = build_X_for_split(
+            matched_df,
+            event_test_mask,
+            pc_scores_by_year,
+            all_nodes,
+            n_features,
+        )
+
+        y_train = y_train_all
+        y_test = y_test_all
+
+        valid_train = np.all(np.isfinite(X_train), axis=1) & np.isfinite(y_train)
+        valid_test = np.all(np.isfinite(X_test), axis=1) & np.isfinite(y_test)
+
+        X_train = X_train[valid_train]
+        y_train = y_train[valid_train]
+
+        X_test = X_test[valid_test]
+        y_test = y_test[valid_test]
+
+        event_id_test = event_id[test_mask][valid_test]
 
         if len(np.unique(y_train)) < 2:
             print(f"Skipping {n_features} features: train set has only one class")
             continue
-
 
         if len(np.unique(y_test)) < 2:
             print(f"Skipping {n_features} features: held-out 2021 test set has only one class")
@@ -511,12 +537,7 @@ def main():
 
         model.fit(X_train, y_train)
 
-
         direction_training_window = "2020_train_only"
-
-        # =====================
-        # SAVE PROBE DIRECTION FOR INTERVENTION
-        # =====================
 
         scaler = model.named_steps["standardscaler"]
         clf = model.named_steps["logisticregression"]
@@ -543,19 +564,8 @@ def main():
             "train_end": np.array([str(TRAIN_END)]),
             "test_start": np.array([str(TEST_START)]),
             "test_end": np.array([str(TEST_END)]),
+            "direction_pc_delta": coef_z_unit,
         }
-
-        if REPRESENTATION == "raw_activations":
-            # If z = (x - mean) / scale,
-            # then adding gamma * coef_z_unit in standardized space corresponds to
-            # adding gamma * scale * coef_z_unit in raw activation space.
-            direction_raw_delta = scaler.scale_.astype(np.float32) * coef_z_unit
-            save_dict["direction_raw_delta"] = direction_raw_delta
-
-        elif REPRESENTATION == "PCA":
-            # This direction lives in PCA-score space, not raw GraphCast activation space.
-            # Useful for analysis, but not directly insertable into GraphCast unless mapped back.
-            save_dict["direction_pc_delta"] = coef_z_unit
 
         np.savez(direction_out, **save_dict)
 
@@ -565,12 +575,19 @@ def main():
             f"{LABEL_MODE}_M{NODE_HIERARCHY_LEVEL}_{n_features}_features_"
             f"{direction_training_window}.joblib",
         )
-        joblib.dump(model, model_out)
+
+        joblib.dump(model, model_out, compress=3)
 
         print("Saved probe direction:", direction_out)
         print("Saved logistic model:", model_out)
 
-        y_test_prob, test_metrics = evaluate_split(model, X_test, y_test, "test", threshold=0.5)
+        y_test_prob, test_metrics = evaluate_split(
+            model,
+            X_test,
+            y_test,
+            "test",
+            threshold=0.5,
+        )
 
         event_dfs = []
 
@@ -578,7 +595,7 @@ def main():
             tmp = event_region_metrics(
                 y_true=y_test,
                 y_prob=y_test_prob,
-                event_id=event_id[test_mask],
+                event_id=event_id_test,
                 threshold=threshold,
             )
             tmp["target"] = WEATHER_FEATURE
@@ -636,12 +653,15 @@ def main():
             f"TEST R={test_metrics['test_recall']:.3f}"
         )
 
+        del X_train, X_test
+
     df = pd.DataFrame(results)
 
     out_csv = os.path.join(
         OUT_DIR,
         f"logistic_probe_2020train_2021test_{LABEL_MODE}_M{NODE_HIERARCHY_LEVEL}_max_{MAX_TIME_DIFFERENCE_HOURS}hour.csv",
     )
+
     df.to_csv(out_csv, index=False)
 
     print("\nSaved:", out_csv)
