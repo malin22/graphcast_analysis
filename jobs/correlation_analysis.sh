@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=TD
+#SBATCH --job-name=corr
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=64G
-#SBATCH --output=logs/TD_m5%j.out
-#SBATCH --error=logs/TD_m5%j.err
+#SBATCH --output=logs/bases_correlation_m5%j.out
+#SBATCH --error=logs/bases_correlation_m5%j.err
 
 set -euo pipefail
 
@@ -23,7 +23,8 @@ conda activate graphcast312
 #srun python -u src/sabines_correlation_experiments/pc_era5_regression_analysis_all_variables.py --mesh-level 5 --model-type 'ElasticNet' --alpha-grid 0.0001 0.0003 0.001 0.003 0.01
 #srun python -u src/sabines_correlation_experiments/put_era5_on_courser_grid.py
 #srun python -u src/sabines_correlation_experiments/put_era5_on_node_mesh.py
+#srun python -u src/sabines_correlation_experiments/tensor_decomposition_subset.py
 
-srun python -u src/sabines_correlation_experiments/tensor_decomposition_subset.py
+srun python -u src/sabines_correlation_experiments/helper_scripts/2020_vs_2021_bases_correlation_validation.py
 
 echo "Finished at: $(date)"

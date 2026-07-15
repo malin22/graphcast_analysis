@@ -1,0 +1,587 @@
+#!/usr/bin/env python3
+from pathlib import Path
+from __future__ import annotations
+
+import numpy as np
+import matplotlib.pyplot as plt
+from PIL import Image
+
+import gc
+from graphcast import icosahedral_mesh
+
+
+LAYER8_MAPS_DIR = Path(
+    "/home/student/s/sascholle/share/graphcast_analysis/plots/2021_pca_projected_on_2021"
+)
+ALL_LAYERS_MAPS_DIR = Path(
+    "/home/student/s/sascholle/share/graphcast_analysis/plots/sabines_experiments/layer_analysis/all_layers_JanuaryPCs"
+)
+LAYER8_COMPONENTS_PATH = Path(
+    "/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021.npy"
+)
+ALL_LAYER_COMPONENTS_PATH = Path(
+    "/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021_Jan_all_layers.npy"
+)
+OUT_DIR_8_vs_all_layers = Path(
+    "/home/student/s/sascholle/share/graphcast_analysis/plots/sabines_experiments/layer_analysis/pc_basis_comparison/Jan_2021_layer8_vs_all_layers_pc_base_comparison"
+)
+N_LAYER8_PCS = 20
+N_ALL_LAYER_PCS = 11
+
+LAYER_COMPARE_OUT_DIR = Path(
+    "/home/student/s/sascholle/share/graphcast_analysis/plots/sabines_experiments/layer_analysis/pc_basis_comparison/layer0_vs_8_vs_15"
+)
+
+JAN_ACTS_DIR = Path(
+    "/share/prj-4d/graphcast_shared/data/graphcast_activations_all_layers_January_2021"
+)
+
+LAYER_PCA_COMPONENTS = {
+    0: Path("/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021_Jan_layer0.npy"),
+    8: Path("/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021_Jan_layer8.npy"),
+    15: Path("/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021_Jan_layer15.npy"),
+}
+
+LAYER_PCA_MEANS = {
+    0: Path("/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021_Jan_layer0.npy"),
+    8: Path("/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021_Jan_layer8.npy"),
+    15: Path("/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021_Jan_layer15.npy"),
+}
+
+N_LAYER_COMPARE_PCS = 15
+LAYERS_TO_COMPARE = [0, 8, 15]
+
+
+def load_rgb(path):
+    img = Image.open(path).convert("RGB")
+    return np.asarray(img)
+
+def layer8_maps_path(pc):
+    return LAYER8_MAPS_DIR / f"pc{pc}_mean_activation_map_year.png"
+
+def all_layers_maps_path(pc):
+    return ALL_LAYERS_MAPS_DIR / f"PC{pc}_layers_grid.png"
+
+def check_inputs():
+    missing = []
+
+    for pc in range(1, N_LAYER8_PCS + 1):
+        p = layer8_maps_path(pc)
+        if not p.exists():
+            missing.append(p)
+
+    for pc in range(1, N_ALL_LAYER_PCS + 1):
+        p = all_layers_maps_path(pc)
+        if not p.exists():
+            missing.append(p)
+
+    if missing:
+        print("Missing files:")
+        for p in missing:
+            print(p)
+        raise FileNotFoundError("Some expected PC plot files are missing.")
+
+
+def make_same_index_side_by_side():
+    """
+    Compare PC1 old-vs-new, PC2 old-vs-new, ... PC11 old-vs-new.
+    """
+    n = N_ALL_LAYER_PCS
+    fig, axes = plt.subplots(nrows=n, ncols=2, figsize=(12, 4.0 * n))
+
+    for row, pc in enumerate(range(1, n + 1)):
+        left_img = load_rgb(layer8_maps_path(pc))
+        right_img = load_rgb(all_layers_maps_path(pc))
+
+        axes[row, 0].imshow(left_img)
+        axes[row, 0].set_title(f"Layer8-only PCA: PC{pc}", fontsize=12)
+        axes[row, 0].axis("off")
+
+        axes[row, 1].imshow(right_img)
+        axes[row, 1].set_title(f"All-layer PCA: PC{pc}", fontsize=12)
+        axes[row, 1].axis("off")
+
+    fig.suptitle(
+        "Same-index comparison: layer8-only PCA vs all-layer PCA",
+        fontsize=16,
+        y=0.995,
+    )
+    plt.tight_layout()
+    out = OUT_DIR_8_vs_all_layers / "side_by_side_same_pc_index.png"
+    plt.savefig(out, dpi=200, bbox_inches="tight")
+    plt.close()
+    print(f"Saved {out}")
+
+
+def normalize_rows(X, eps=1e-12):
+    norms = np.linalg.norm(X, axis=1, keepdims=True)
+    return X / np.maximum(norms, eps)
+
+
+def load_components(path, n_pcs):
+    X = np.load(path)
+    if X.ndim != 2:
+        raise ValueError(f"Expected PCA components [n_pcs, n_features], got {X.shape}")
+
+    n_pcs = min(n_pcs, X.shape[0])
+    return X[:n_pcs].astype(np.float64)
+
+
+def compute_basis_cosine(layer8_components, all_layer_components):
+    """
+    Returns signed cosine similarity:
+
+      sim[i, j] = cosine(all-layer PC i, layer8-only PC j)
+
+    Shape:
+      [n_all_layer_pcs, n_layer8_pcs]
+    """
+    A = normalize_rows(all_layer_components)
+    B = normalize_rows(layer8_components)
+    return A @ B.T
+
+
+def plot_heatmap(sim, output_path, title, use_abs=False):
+    data = np.abs(sim) if use_abs else sim
+
+    vmin, vmax = (0, 1) if use_abs else (-1, 1)
+    cmap = "viridis" if use_abs else "coolwarm"
+
+    plt.figure(figsize=(12, 7))
+    im = plt.imshow(data, vmin=vmin, vmax=vmax, cmap=cmap, aspect="auto")
+
+    plt.yticks(
+        np.arange(data.shape[0]),
+        [f"All-layer PC{i}" for i in range(1, data.shape[0] + 1)],
+    )
+    plt.xticks(
+        np.arange(data.shape[1]),
+        [f"Layer8 PC{i}" for i in range(1, data.shape[1] + 1)],
+        rotation=90,
+    )
+
+    plt.colorbar(im, label="Absolute cosine similarity" if use_abs else "Signed cosine similarity")
+    plt.title(title)
+    plt.xlabel("Layer8-only PCA basis")
+    plt.ylabel("All-layer PCA basis")
+
+    match_scores = np.abs(sim)
+    for i in range(match_scores.shape[0]):
+        best_j = int(np.nanargmax(match_scores[i]))
+        plt.text(
+            best_j,
+            i,
+            "*",
+            ha="center",
+            va="center",
+            color="white" if use_abs else "black",
+            fontsize=16,
+            fontweight="bold",
+        )
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"Saved {output_path}")
+
+
+def plot_best_match_bars(sim, output_path):
+    abs_sim = np.abs(sim)
+    best_j = np.nanargmax(abs_sim, axis=1)
+    best_abs = abs_sim[np.arange(abs_sim.shape[0]), best_j]
+    best_signed = sim[np.arange(sim.shape[0]), best_j]
+
+    labels = [f"All PC{i+1}\n-> L8 PC{best_j[i]+1}" for i in range(len(best_j))]
+    colors = ["tab:red" if s < 0 else "tab:blue" for s in best_signed]
+
+    plt.figure(figsize=(14, 5))
+    x = np.arange(len(labels))
+    plt.bar(x, best_abs, color=colors)
+
+    plt.xticks(x, labels, rotation=90)
+    plt.ylabel("Best absolute basis cosine")
+    plt.ylim(0, 1.05)
+    plt.title("Best PCA-basis matches; red means sign-flipped match")
+
+    for i, signed_score in enumerate(best_signed):
+        plt.text(
+            i,
+            best_abs[i] + 0.02,
+            f"{signed_score:+.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"Saved {output_path}")
+
+
+def save_match_table(sim, output_path):
+    abs_sim = np.abs(sim)
+    best_j = np.nanargmax(abs_sim, axis=1)
+
+    with open(output_path, "w") as f:
+        f.write("all_layer_pc,best_layer8_pc,signed_cosine,abs_cosine,sign_relation\n")
+
+        for i, j in enumerate(best_j):
+            signed = float(sim[i, j])
+            abs_val = abs(signed)
+            sign_relation = "same_sign" if signed >= 0 else "flipped_sign"
+
+            f.write(
+                f"PC{i+1},PC{j+1},{signed:.6f},{abs_val:.6f},{sign_relation}\n"
+            )
+
+    print(f"Saved {output_path}")
+
+
+def load_activation_matrix(path: Path) -> np.ndarray:
+    x = np.load(path, mmap_mode="r")
+
+    if x.dtype == np.dtype("|V2"):
+        x = x.view(np.float16)
+
+    x = np.asarray(x, dtype=np.float32)
+
+    if x.ndim == 3 and x.shape[1] == 1:
+        x = x[:, 0, :]
+
+    x = np.squeeze(x)
+
+    if x.ndim != 2:
+        raise ValueError(f"Expected [nodes, features], got {x.shape} for {path.name}")
+
+    return x
+
+
+def vertices_to_latlon(vertices: np.ndarray):
+    lat = np.degrees(np.arcsin(vertices[:, 2]))
+    lon = np.degrees(np.arctan2(vertices[:, 1], vertices[:, 0]))
+    return lat, lon
+
+
+def get_mesh_latlon(splits: int = 6):
+    meshes = icosahedral_mesh.get_hierarchy_of_triangular_meshes_for_sphere(splits=splits)
+    vertices = meshes[splits].vertices
+    return vertices_to_latlon(vertices)
+
+
+def plot_pc_map(scores, lat, lon, out_path, title):
+    vmax = np.nanpercentile(np.abs(scores), 99)
+    vmax = max(vmax, 1e-6)
+
+    plt.figure(figsize=(12, 6))
+    sc = plt.scatter(
+        lon,
+        lat,
+        c=scores,
+        s=2,
+        cmap="coolwarm",
+        vmin=-vmax,
+        vmax=vmax,
+        linewidths=0,
+    )
+    plt.colorbar(sc, label="PC score")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.title(title)
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
+    plt.close()
+
+
+def signed_same_index_cosines(components_a, components_b):
+    A = normalize_rows(components_a)
+    B = normalize_rows(components_b)
+    return np.sum(A * B, axis=1)
+
+
+def full_basis_cosine_matrix(components_a, components_b):
+    A = normalize_rows(components_a)
+    B = normalize_rows(components_b)
+    return A @ B.T
+
+
+def compute_layer0_8_15_basis_metrics():
+    components = {
+        layer: np.load(LAYER_PCA_COMPONENTS[layer])[:N_LAYER_COMPARE_PCS].astype(np.float64)
+        for layer in LAYERS_TO_COMPARE
+    }
+
+    for layer, X in components.items():
+        print(f"Layer {layer} components: {X.shape}")
+
+    pairs = [(0, 8), (8, 15), (0, 15)]
+
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(18, 5))
+
+    for ax, (a, b) in zip(axes, pairs):
+        sim = full_basis_cosine_matrix(components[a], components[b])
+        abs_sim = np.abs(sim)
+
+        np.save(LAYER_COMPARE_OUT_DIR / f"signed_basis_cosine_layer{a}_vs_layer{b}.npy", sim)
+        np.save(LAYER_COMPARE_OUT_DIR / f"abs_basis_cosine_layer{a}_vs_layer{b}.npy", abs_sim)
+
+        im = ax.imshow(abs_sim, vmin=0, vmax=1, cmap="viridis", aspect="auto")
+        ax.set_title(f"|cosine|: layer {a} vs layer {b}")
+        ax.set_xlabel(f"Layer {b} PC")
+        ax.set_ylabel(f"Layer {a} PC")
+        ax.set_xticks(np.arange(N_LAYER_COMPARE_PCS))
+        ax.set_xticklabels([str(i) for i in range(1, N_LAYER_COMPARE_PCS + 1)], rotation=90)
+        ax.set_yticks(np.arange(N_LAYER_COMPARE_PCS))
+        ax.set_yticklabels([str(i) for i in range(1, N_LAYER_COMPARE_PCS + 1)])
+
+        for i in range(N_LAYER_COMPARE_PCS):
+            best_j = int(np.nanargmax(abs_sim[i]))
+            ax.text(best_j, i, "*", ha="center", va="center", color="white", fontsize=14)
+
+        csv_path = LAYER_COMPARE_OUT_DIR / f"basis_best_matches_layer{a}_vs_layer{b}.csv"
+        with open(csv_path, "w") as f:
+            f.write(
+                f"layer{a}_pc,best_layer{b}_pc,signed_cosine,abs_cosine,"
+                f"same_index_signed_cosine,same_index_abs_cosine\n"
+            )
+
+            for i in range(N_LAYER_COMPARE_PCS):
+                best_j = int(np.nanargmax(abs_sim[i]))
+                signed = float(sim[i, best_j])
+                same_signed = float(sim[i, i])
+
+                f.write(
+                    f"PC{i+1},PC{best_j+1},"
+                    f"{signed:.6f},{abs(signed):.6f},"
+                    f"{same_signed:.6f},{abs(same_signed):.6f}\n"
+                )
+
+        print(f"Saved {csv_path}")
+
+    fig.colorbar(im, ax=axes.ravel().tolist(), label="Absolute basis cosine")
+    fig.suptitle("PCA basis similarity across independently fitted layers", fontsize=16)
+
+    out = LAYER_COMPARE_OUT_DIR / "layer0_8_15_basis_abs_cosine_heatmaps.png"
+    plt.savefig(out, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"Saved {out}")
+
+
+
+def compute_layer_mean_pc_maps(layer: int, n_pcs: int = N_LAYER_COMPARE_PCS):
+    """
+    Project January activations from one mesh_gnn layer onto that layer's own PCA basis.
+
+    Returns:
+      mean_scores: [nodes, n_pcs]
+    """
+    components = np.load(LAYER_PCA_COMPONENTS[layer])[:n_pcs].astype(np.float32)
+    mean = np.load(LAYER_PCA_MEANS[layer]).astype(np.float32)
+
+    files = sorted(
+        JAN_ACTS_DIR.glob(
+            f"layer{layer:04d}_mesh_gnn_post_res_nodes_mesh_nodes_t*.npy"
+        )
+    )
+
+    if not files:
+        raise FileNotFoundError(f"No activation files found for layer {layer} in {JAN_ACTS_DIR}")
+
+    print(f"Layer {layer}: found {len(files)} activation files")
+
+    score_sum = None
+    valid_count = 0
+
+    for i, path in enumerate(files, start=1):
+        X = load_activation_matrix(path)
+
+        if np.isnan(X).any():
+            print(f"WARNING: skipping {path.name}, contains NaNs")
+            continue
+
+        if X.shape[1] != mean.shape[0]:
+            raise ValueError(
+                f"Feature mismatch for {path.name}: activations {X.shape[1]}, mean {mean.shape[0]}"
+            )
+
+        scores = (X - mean) @ components.T  # [nodes, n_pcs]
+
+        if score_sum is None:
+            score_sum = np.zeros_like(scores, dtype=np.float64)
+
+        score_sum += scores
+        valid_count += 1
+
+        if i % 25 == 0:
+            print(f"  layer {layer}: processed {i}/{len(files)} files")
+
+        del X, scores
+        gc.collect()
+
+    if valid_count == 0:
+        raise ValueError(f"No valid files for layer {layer}")
+
+    mean_scores = (score_sum / valid_count).astype(np.float32)
+    print(f"Layer {layer}: averaged {valid_count} valid files")
+
+    return mean_scores
+
+
+def make_layer_mean_maps_and_overview():
+    """
+    Creates:
+      - individual PC maps for layer 0, 8, 15
+      - one 15 x 3 overview figure
+      - saved mean score arrays
+    """
+    LAYER_COMPARE_OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    lat, lon = get_mesh_latlon(splits=6)
+
+    layer_mean_scores = {}
+
+    for layer in LAYERS_TO_COMPARE:
+        layer_dir = LAYER_COMPARE_OUT_DIR / f"layer{layer}"
+        layer_dir.mkdir(parents=True, exist_ok=True)
+
+        mean_scores = compute_layer_mean_pc_maps(layer, n_pcs=N_LAYER_COMPARE_PCS)
+
+        if mean_scores.shape[0] != len(lat):
+            raise ValueError(
+                f"Layer {layer} node mismatch: scores have {mean_scores.shape[0]} nodes, "
+                f"mesh has {len(lat)} nodes"
+    )
+        layer_mean_scores[layer] = mean_scores
+
+        np.save(layer_dir / f"layer{layer}_mean_pc_scores.npy", mean_scores)
+
+        for pc_idx in range(N_LAYER_COMPARE_PCS):
+            pc = pc_idx + 1
+            plot_pc_map(
+                mean_scores[:, pc_idx],
+                lat,
+                lon,
+                layer_dir / f"PC{pc}_mean_activation_map_JFM.png",
+                title=f"Layer {layer} independently fitted PCA: PC{pc} JFM mean",
+            )
+
+    plot_layer0_8_15_overview(layer_mean_scores, lat, lon)
+    #compute_layer0_8_15_basis_metrics()
+
+def plot_layer0_8_15_overview(layer_mean_scores, lat, lon):
+    components = {
+        layer: np.load(LAYER_PCA_COMPONENTS[layer])[:N_LAYER_COMPARE_PCS].astype(np.float64)
+        for layer in LAYERS_TO_COMPARE
+    }
+
+    cos_0_8 = signed_same_index_cosines(components[0], components[8])
+    cos_8_15 = signed_same_index_cosines(components[8], components[15])
+    cos_0_15 = signed_same_index_cosines(components[0], components[15])
+
+    all_vals = np.concatenate([
+        layer_mean_scores[layer][:, :N_LAYER_COMPARE_PCS].ravel()
+        for layer in LAYERS_TO_COMPARE
+    ])
+    vmax = np.nanpercentile(np.abs(all_vals), 99)
+    vmax = max(vmax, 1e-6)
+
+    fig, axes = plt.subplots(
+        nrows=N_LAYER_COMPARE_PCS,
+        ncols=3,
+        figsize=(15, 3.0 * N_LAYER_COMPARE_PCS),
+        sharex=True,
+        sharey=True,
+    )
+
+    for row in range(N_LAYER_COMPARE_PCS):
+        pc = row + 1
+
+        for col, layer in enumerate(LAYERS_TO_COMPARE):
+            ax = axes[row, col]
+            scores = layer_mean_scores[layer][:, row]
+
+            sc = ax.scatter(
+                lon,
+                lat,
+                c=scores,
+                s=1,
+                cmap="coolwarm",
+                vmin=-vmax,
+                vmax=vmax,
+                linewidths=0,
+            )
+
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+            if row == 0:
+                ax.set_title(f"Layer {layer}", fontsize=13)
+
+        axes[row, 0].set_ylabel(
+            (
+                f"PC{pc}\n"
+                f"L0-L8 {cos_0_8[row]:+.2f}\n"
+                f"L8-L15 {cos_8_15[row]:+.2f}\n"
+                f"L0-L15 {cos_0_15[row]:+.2f}"
+            ),
+            fontsize=9,
+            rotation=0,
+            labelpad=55,
+            va="center",
+        )
+
+    fig.suptitle(
+        "January mean PC maps from independently fitted layer PCAs",
+        fontsize=16,
+        y=0.995,
+    )
+
+    cbar = fig.colorbar(sc, ax=axes.ravel().tolist(), shrink=0.6)
+    cbar.set_label("PC score")
+
+    out = LAYER_COMPARE_OUT_DIR / "layer0_8_15_top15_mean_pc_maps.png"
+    plt.savefig(out, dpi=250, bbox_inches="tight")
+    plt.close()
+    print(f"Saved {out}")
+
+
+RUN_8_VS_ALL = False
+RUN_LAYER_0_8_15 = True
+
+
+def main():
+    if RUN_8_VS_ALL:
+        OUT_DIR_8_vs_all_layers.mkdir(parents=True, exist_ok=True)
+        check_inputs()
+
+        layer8_components = load_components(LAYER8_COMPONENTS_PATH, N_LAYER8_PCS)
+        all_layer_components = load_components(ALL_LAYER_COMPONENTS_PATH, N_ALL_LAYER_PCS)
+
+        if layer8_components.shape[1] != all_layer_components.shape[1]:
+            raise ValueError(
+                "Feature dimensions do not match: "
+                f"{layer8_components.shape[1]} vs {all_layer_components.shape[1]}"
+            )
+
+        sim = compute_basis_cosine(
+            layer8_components=layer8_components,
+            all_layer_components=all_layer_components,
+        )
+
+        np.save(OUT_DIR_8_vs_all_layers / "basis_signed_cosine_similarity.npy", sim)
+        np.save(OUT_DIR_8_vs_all_layers / "basis_abs_cosine_similarity.npy", np.abs(sim))
+
+        plot_heatmap(sim, OUT_DIR_8_vs_all_layers / "basis_signed_cosine_heatmap.png",
+                     "Signed PCA-basis cosine: all-layer PCs vs layer8-only PCs", use_abs=False)
+        plot_heatmap(sim, OUT_DIR_8_vs_all_layers / "basis_absolute_cosine_heatmap.png",
+                     "Absolute PCA-basis cosine: all-layer PCs vs layer8-only PCs", use_abs=True)
+        plot_best_match_bars(sim, OUT_DIR_8_vs_all_layers / "basis_best_match_bars.png")
+        save_match_table(sim, OUT_DIR_8_vs_all_layers / "basis_best_matches.csv")
+        make_same_index_side_by_side()
+
+    if RUN_LAYER_0_8_15:
+        make_layer_mean_maps_and_overview()
+
+
+if __name__ == "__main__":
+    main()

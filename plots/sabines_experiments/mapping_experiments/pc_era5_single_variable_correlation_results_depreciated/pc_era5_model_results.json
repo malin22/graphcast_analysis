@@ -1,0 +1,2428 @@
+{
+  "PC_1": {
+    "pc_name": "PC_1",
+    "selected_features": [
+      "land_sea_mask",
+      "specific_humidity_lev34",
+      "specific_humidity_lev35",
+      "specific_humidity_lev36",
+      "specific_humidity_lev33",
+      "specific_humidity_lev32",
+      "2m_temperature",
+      "specific_humidity_lev31",
+      "specific_humidity_lev30",
+      "geopotential_at_surface",
+      "specific_humidity_lev05",
+      "specific_humidity_lev04",
+      "specific_humidity_lev29",
+      "temperature_lev23",
+      "temperature_lev22",
+      "temperature_lev24",
+      "specific_humidity_lev03",
+      "temperature_lev25",
+      "temperature_lev21",
+      "geopotential_lev13",
+      "geopotential_lev14",
+      "geopotential_lev12",
+      "geopotential_lev15",
+      "geopotential_lev16",
+      "temperature_lev20",
+      "geopotential_lev11",
+      "geopotential_lev17",
+      "geopotential_lev18",
+      "temperature_lev19",
+      "temperature_lev26"
+    ],
+    "model_type": "ElasticNet",
+    "alpha": 0.0001,
+    "l1_ratio": 0.7,
+    "val_r2": 0.8082811236381531,
+    "ranked_features_standardized": [
+      {
+        "feature": "temperature_lev26",
+        "coefficient": -1.1835153102874756,
+        "abs_coefficient": 1.1835153102874756
+      },
+      {
+        "feature": "geopotential_lev18",
+        "coefficient": 0.8465780019760132,
+        "abs_coefficient": 0.8465780019760132
+      },
+      {
+        "feature": "geopotential_lev12",
+        "coefficient": -0.7087088227272034,
+        "abs_coefficient": 0.7087088227272034
+      },
+      {
+        "feature": "land_sea_mask",
+        "coefficient": -0.6519523859024048,
+        "abs_coefficient": 0.6519523859024048
+      },
+      {
+        "feature": "temperature_lev19",
+        "coefficient": -0.6038941740989685,
+        "abs_coefficient": 0.6038941740989685
+      },
+      {
+        "feature": "2m_temperature",
+        "coefficient": 0.5997017025947571,
+        "abs_coefficient": 0.5997017025947571
+      },
+      {
+        "feature": "temperature_lev25",
+        "coefficient": 0.593429684638977,
+        "abs_coefficient": 0.593429684638977
+      },
+      {
+        "feature": "specific_humidity_lev34",
+        "coefficient": 0.5877532958984375,
+        "abs_coefficient": 0.5877532958984375
+      },
+      {
+        "feature": "geopotential_lev11",
+        "coefficient": 0.5613313317298889,
+        "abs_coefficient": 0.5613313317298889
+      },
+      {
+        "feature": "specific_humidity_lev30",
+        "coefficient": 0.4402881860733032,
+        "abs_coefficient": 0.4402881860733032
+      },
+      {
+        "feature": "specific_humidity_lev36",
+        "coefficient": -0.35170188546180725,
+        "abs_coefficient": 0.35170188546180725
+      },
+      {
+        "feature": "temperature_lev22",
+        "coefficient": 0.3439895808696747,
+        "abs_coefficient": 0.3439895808696747
+      },
+      {
+        "feature": "specific_humidity_lev35",
+        "coefficient": 0.3024252951145172,
+        "abs_coefficient": 0.3024252951145172
+      },
+      {
+        "feature": "specific_humidity_lev29",
+        "coefficient": -0.2749982476234436,
+        "abs_coefficient": 0.2749982476234436
+      },
+      {
+        "feature": "temperature_lev24",
+        "coefficient": -0.17532259225845337,
+        "abs_coefficient": 0.17532259225845337
+      },
+      {
+        "feature": "geopotential_at_surface",
+        "coefficient": 0.16959410905838013,
+        "abs_coefficient": 0.16959410905838013
+      },
+      {
+        "feature": "geopotential_lev16",
+        "coefficient": -0.11408491432666779,
+        "abs_coefficient": 0.11408491432666779
+      },
+      {
+        "feature": "temperature_lev21",
+        "coefficient": -0.09785453975200653,
+        "abs_coefficient": 0.09785453975200653
+      },
+      {
+        "feature": "geopotential_lev15",
+        "coefficient": -0.08262518048286438,
+        "abs_coefficient": 0.08262518048286438
+      },
+      {
+        "feature": "specific_humidity_lev33",
+        "coefficient": -0.07960119098424911,
+        "abs_coefficient": 0.07960119098424911
+      },
+      {
+        "feature": "specific_humidity_lev31",
+        "coefficient": -0.06517074257135391,
+        "abs_coefficient": 0.06517074257135391
+      },
+      {
+        "feature": "geopotential_lev14",
+        "coefficient": -0.05316060036420822,
+        "abs_coefficient": 0.05316060036420822
+      },
+      {
+        "feature": "specific_humidity_lev05",
+        "coefficient": -0.04512433335185051,
+        "abs_coefficient": 0.04512433335185051
+      },
+      {
+        "feature": "specific_humidity_lev03",
+        "coefficient": -0.034725725650787354,
+        "abs_coefficient": 0.034725725650787354
+      },
+      {
+        "feature": "geopotential_lev13",
+        "coefficient": -0.03464150056242943,
+        "abs_coefficient": 0.03464150056242943
+      },
+      {
+        "feature": "specific_humidity_lev32",
+        "coefficient": -0.018504386767745018,
+        "abs_coefficient": 0.018504386767745018
+      },
+      {
+        "feature": "specific_humidity_lev04",
+        "coefficient": -0.011211112141609192,
+        "abs_coefficient": 0.011211112141609192
+      },
+      {
+        "feature": "geopotential_lev17",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "temperature_lev20",
+        "coefficient": 0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "temperature_lev23",
+        "coefficient": 0.0,
+        "abs_coefficient": 0.0
+      }
+    ],
+    "ranked_features_raw": [
+      {
+        "feature": "specific_humidity_lev05",
+        "coefficient": -666758.1875,
+        "abs_coefficient": 666758.1875
+      },
+      {
+        "feature": "specific_humidity_lev03",
+        "coefficient": -550077.375,
+        "abs_coefficient": 550077.375
+      },
+      {
+        "feature": "specific_humidity_lev04",
+        "coefficient": -165199.609375,
+        "abs_coefficient": 165199.609375
+      },
+      {
+        "feature": "specific_humidity_lev34",
+        "coefficient": 481.0762634277344,
+        "abs_coefficient": 481.0762634277344
+      },
+      {
+        "feature": "specific_humidity_lev30",
+        "coefficient": 481.03460693359375,
+        "abs_coefficient": 481.03460693359375
+      },
+      {
+        "feature": "specific_humidity_lev29",
+        "coefficient": -320.4136657714844,
+        "abs_coefficient": 320.4136657714844
+      },
+      {
+        "feature": "specific_humidity_lev36",
+        "coefficient": -269.0804138183594,
+        "abs_coefficient": 269.0804138183594
+      },
+      {
+        "feature": "specific_humidity_lev35",
+        "coefficient": 235.89442443847656,
+        "abs_coefficient": 235.89442443847656
+      },
+      {
+        "feature": "specific_humidity_lev33",
+        "coefficient": -70.95464324951172,
+        "abs_coefficient": 70.95464324951172
+      },
+      {
+        "feature": "specific_humidity_lev31",
+        "coefficient": -66.79963684082031,
+        "abs_coefficient": 66.79963684082031
+      },
+      {
+        "feature": "specific_humidity_lev32",
+        "coefficient": -17.769975662231445,
+        "abs_coefficient": 17.769975662231445
+      },
+      {
+        "feature": "land_sea_mask",
+        "coefficient": -6.607624053955078,
+        "abs_coefficient": 6.607624053955078
+      },
+      {
+        "feature": "temperature_lev26",
+        "coefficient": -0.37053361535072327,
+        "abs_coefficient": 0.37053361535072327
+      },
+      {
+        "feature": "temperature_lev19",
+        "coefficient": -0.21732719242572784,
+        "abs_coefficient": 0.21732719242572784
+      },
+      {
+        "feature": "temperature_lev25",
+        "coefficient": 0.19021594524383545,
+        "abs_coefficient": 0.19021594524383545
+      },
+      {
+        "feature": "2m_temperature",
+        "coefficient": 0.13658222556114197,
+        "abs_coefficient": 0.13658222556114197
+      },
+      {
+        "feature": "temperature_lev22",
+        "coefficient": 0.1213727816939354,
+        "abs_coefficient": 0.1213727816939354
+      },
+      {
+        "feature": "temperature_lev24",
+        "coefficient": -0.058304790407419205,
+        "abs_coefficient": 0.058304790407419205
+      },
+      {
+        "feature": "temperature_lev21",
+        "coefficient": -0.03465002775192261,
+        "abs_coefficient": 0.03465002775192261
+      },
+      {
+        "feature": "geopotential_lev18",
+        "coefficient": 0.0008339097257703543,
+        "abs_coefficient": 0.0008339097257703543
+      },
+      {
+        "feature": "geopotential_lev12",
+        "coefficient": -0.0005493437638506293,
+        "abs_coefficient": 0.0005493437638506293
+      },
+      {
+        "feature": "geopotential_lev11",
+        "coefficient": 0.00044409805559553206,
+        "abs_coefficient": 0.00044409805559553206
+      },
+      {
+        "feature": "geopotential_at_surface",
+        "coefficient": 0.00010449282854096964,
+        "abs_coefficient": 0.00010449282854096964
+      },
+      {
+        "feature": "geopotential_lev16",
+        "coefficient": -9.342712291982025e-05,
+        "abs_coefficient": 9.342712291982025e-05
+      },
+      {
+        "feature": "geopotential_lev15",
+        "coefficient": -6.55803523841314e-05,
+        "abs_coefficient": 6.55803523841314e-05
+      },
+      {
+        "feature": "geopotential_lev14",
+        "coefficient": -4.1331408283440396e-05,
+        "abs_coefficient": 4.1331408283440396e-05
+      },
+      {
+        "feature": "geopotential_lev13",
+        "coefficient": -2.6706607968662865e-05,
+        "abs_coefficient": 2.6706607968662865e-05
+      },
+      {
+        "feature": "geopotential_lev17",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "temperature_lev20",
+        "coefficient": 0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "temperature_lev23",
+        "coefficient": 0.0,
+        "abs_coefficient": 0.0
+      }
+    ],
+    "coef_standardized": {
+      "land_sea_mask": -0.6519523859024048,
+      "specific_humidity_lev34": 0.5877532958984375,
+      "specific_humidity_lev35": 0.3024252951145172,
+      "specific_humidity_lev36": -0.35170188546180725,
+      "specific_humidity_lev33": -0.07960119098424911,
+      "specific_humidity_lev32": -0.018504386767745018,
+      "2m_temperature": 0.5997017025947571,
+      "specific_humidity_lev31": -0.06517074257135391,
+      "specific_humidity_lev30": 0.4402881860733032,
+      "geopotential_at_surface": 0.16959410905838013,
+      "specific_humidity_lev05": -0.04512433335185051,
+      "specific_humidity_lev04": -0.011211112141609192,
+      "specific_humidity_lev29": -0.2749982476234436,
+      "temperature_lev23": 0.0,
+      "temperature_lev22": 0.3439895808696747,
+      "temperature_lev24": -0.17532259225845337,
+      "specific_humidity_lev03": -0.034725725650787354,
+      "temperature_lev25": 0.593429684638977,
+      "temperature_lev21": -0.09785453975200653,
+      "geopotential_lev13": -0.03464150056242943,
+      "geopotential_lev14": -0.05316060036420822,
+      "geopotential_lev12": -0.7087088227272034,
+      "geopotential_lev15": -0.08262518048286438,
+      "geopotential_lev16": -0.11408491432666779,
+      "temperature_lev20": 0.0,
+      "geopotential_lev11": 0.5613313317298889,
+      "geopotential_lev17": -0.0,
+      "geopotential_lev18": 0.8465780019760132,
+      "temperature_lev19": -0.6038941740989685,
+      "temperature_lev26": -1.1835153102874756
+    },
+    "coef_raw": {
+      "land_sea_mask": -6.607624053955078,
+      "specific_humidity_lev34": 481.0762634277344,
+      "specific_humidity_lev35": 235.89442443847656,
+      "specific_humidity_lev36": -269.0804138183594,
+      "specific_humidity_lev33": -70.95464324951172,
+      "specific_humidity_lev32": -17.769975662231445,
+      "2m_temperature": 0.13658222556114197,
+      "specific_humidity_lev31": -66.79963684082031,
+      "specific_humidity_lev30": 481.03460693359375,
+      "geopotential_at_surface": 0.00010449282854096964,
+      "specific_humidity_lev05": -666758.1875,
+      "specific_humidity_lev04": -165199.609375,
+      "specific_humidity_lev29": -320.4136657714844,
+      "temperature_lev23": 0.0,
+      "temperature_lev22": 0.1213727816939354,
+      "temperature_lev24": -0.058304790407419205,
+      "specific_humidity_lev03": -550077.375,
+      "temperature_lev25": 0.19021594524383545,
+      "temperature_lev21": -0.03465002775192261,
+      "geopotential_lev13": -2.6706607968662865e-05,
+      "geopotential_lev14": -4.1331408283440396e-05,
+      "geopotential_lev12": -0.0005493437638506293,
+      "geopotential_lev15": -6.55803523841314e-05,
+      "geopotential_lev16": -9.342712291982025e-05,
+      "temperature_lev20": 0.0,
+      "geopotential_lev11": 0.00044409805559553206,
+      "geopotential_lev17": -0.0,
+      "geopotential_lev18": 0.0008339097257703543,
+      "temperature_lev19": -0.21732719242572784,
+      "temperature_lev26": -0.37053361535072327
+    },
+    "intercept_raw": 27.042607169429424,
+    "field_importance": [
+      {
+        "field": "temperature",
+        "abs_weight_sum": 2.9980058819055557
+      },
+      {
+        "field": "geopotential",
+        "abs_weight_sum": 2.4011303521692753
+      },
+      {
+        "field": "specific_humidity",
+        "abs_weight_sum": 2.211504401639104
+      },
+      {
+        "field": "land_sea_mask",
+        "abs_weight_sum": 0.6519523859024048
+      },
+      {
+        "field": "2m_temperature",
+        "abs_weight_sum": 0.5997017025947571
+      },
+      {
+        "field": "geopotential_at_surface",
+        "abs_weight_sum": 0.16959410905838013
+      }
+    ],
+    "field_importance_raw": [
+      {
+        "field": "specific_humidity",
+        "abs_weight_sum": 1383978.1955051422
+      },
+      {
+        "field": "land_sea_mask",
+        "abs_weight_sum": 6.607624053955078
+      },
+      {
+        "field": "temperature",
+        "abs_weight_sum": 0.9924043528735638
+      },
+      {
+        "field": "2m_temperature",
+        "abs_weight_sum": 0.13658222556114197
+      },
+      {
+        "field": "geopotential",
+        "abs_weight_sum": 0.0020543970367725706
+      },
+      {
+        "field": "geopotential_at_surface",
+        "abs_weight_sum": 0.00010449282854096964
+      }
+    ],
+    "vertical_band_importance": [
+      {
+        "band": "mid",
+        "abs_weight_sum": 3.844583883881569
+      },
+      {
+        "band": "upper",
+        "abs_weight_sum": 2.120443230494857
+      },
+      {
+        "band": "lower",
+        "abs_weight_sum": 1.6456135213375092
+      },
+      {
+        "band": "static",
+        "abs_weight_sum": 1.421248197555542
+      }
+    ],
+    "vertical_band_importance_raw": [
+      {
+        "band": "lower",
+        "abs_weight_sum": 1382035.173095487
+      },
+      {
+        "band": "upper",
+        "abs_weight_sum": 1943.023630142212
+      },
+      {
+        "band": "static",
+        "abs_weight_sum": 6.744310772344761
+      },
+      {
+        "band": "mid",
+        "abs_weight_sum": 0.9932382625993341
+      }
+    ],
+    "n_train_samples": 11141349,
+    "n_val_samples": 2730442
+  },
+  "PC_2": {
+    "pc_name": "PC_2",
+    "selected_features": [
+      "specific_humidity_lev26",
+      "specific_humidity_lev25",
+      "specific_humidity_lev27",
+      "specific_humidity_lev24",
+      "specific_humidity_lev28",
+      "specific_humidity_lev23",
+      "specific_humidity_lev22",
+      "specific_humidity_lev21",
+      "specific_humidity_lev29",
+      "specific_humidity_lev20",
+      "specific_humidity_lev19",
+      "mean_sea_level_pressure",
+      "geopotential_lev36",
+      "geopotential_lev35",
+      "specific_humidity_lev18",
+      "specific_humidity_lev30",
+      "geopotential_lev34",
+      "total_precipitation_6hr",
+      "specific_humidity_lev17",
+      "geopotential_lev33",
+      "specific_humidity_lev16",
+      "geopotential_lev32",
+      "specific_humidity_lev15",
+      "specific_humidity_lev31",
+      "specific_humidity_lev14",
+      "geopotential_lev31",
+      "vertical_velocity_lev24",
+      "vertical_velocity_lev25",
+      "vertical_velocity_lev23",
+      "geopotential_lev30"
+    ],
+    "model_type": "ElasticNet",
+    "alpha": 0.0001,
+    "l1_ratio": 0.7,
+    "val_r2": 0.6288783550262451,
+    "ranked_features_standardized": [
+      {
+        "feature": "geopotential_lev30",
+        "coefficient": 10.471997261047363,
+        "abs_coefficient": 10.471997261047363
+      },
+      {
+        "feature": "geopotential_lev32",
+        "coefficient": -9.600269317626953,
+        "abs_coefficient": 9.600269317626953
+      },
+      {
+        "feature": "geopotential_lev35",
+        "coefficient": 6.839714050292969,
+        "abs_coefficient": 6.839714050292969
+      },
+      {
+        "feature": "geopotential_lev33",
+        "coefficient": -4.964625835418701,
+        "abs_coefficient": 4.964625835418701
+      },
+      {
+        "feature": "geopotential_lev31",
+        "coefficient": -3.1760146617889404,
+        "abs_coefficient": 3.1760146617889404
+      },
+      {
+        "feature": "geopotential_lev34",
+        "coefficient": 2.9755430221557617,
+        "abs_coefficient": 2.9755430221557617
+      },
+      {
+        "feature": "geopotential_lev36",
+        "coefficient": -1.8202766180038452,
+        "abs_coefficient": 1.8202766180038452
+      },
+      {
+        "feature": "specific_humidity_lev31",
+        "coefficient": 1.1897900104522705,
+        "abs_coefficient": 1.1897900104522705
+      },
+      {
+        "feature": "specific_humidity_lev28",
+        "coefficient": -0.7421820759773254,
+        "abs_coefficient": 0.7421820759773254
+      },
+      {
+        "feature": "specific_humidity_lev30",
+        "coefficient": -0.3342435956001282,
+        "abs_coefficient": 0.3342435956001282
+      },
+      {
+        "feature": "specific_humidity_lev29",
+        "coefficient": -0.30666980147361755,
+        "abs_coefficient": 0.30666980147361755
+      },
+      {
+        "feature": "specific_humidity_lev26",
+        "coefficient": -0.29987862706184387,
+        "abs_coefficient": 0.29987862706184387
+      },
+      {
+        "feature": "mean_sea_level_pressure",
+        "coefficient": -0.171706423163414,
+        "abs_coefficient": 0.171706423163414
+      },
+      {
+        "feature": "specific_humidity_lev14",
+        "coefficient": 0.08771825581789017,
+        "abs_coefficient": 0.08771825581789017
+      },
+      {
+        "feature": "specific_humidity_lev22",
+        "coefficient": -0.08071058243513107,
+        "abs_coefficient": 0.08071058243513107
+      },
+      {
+        "feature": "specific_humidity_lev19",
+        "coefficient": -0.05611678212881088,
+        "abs_coefficient": 0.05611678212881088
+      },
+      {
+        "feature": "specific_humidity_lev20",
+        "coefficient": -0.05605393648147583,
+        "abs_coefficient": 0.05605393648147583
+      },
+      {
+        "feature": "vertical_velocity_lev25",
+        "coefficient": 0.05516667291522026,
+        "abs_coefficient": 0.05516667291522026
+      },
+      {
+        "feature": "specific_humidity_lev17",
+        "coefficient": 0.05005423724651337,
+        "abs_coefficient": 0.05005423724651337
+      },
+      {
+        "feature": "specific_humidity_lev15",
+        "coefficient": -0.04900357499718666,
+        "abs_coefficient": 0.04900357499718666
+      },
+      {
+        "feature": "specific_humidity_lev16",
+        "coefficient": 0.04297421872615814,
+        "abs_coefficient": 0.04297421872615814
+      },
+      {
+        "feature": "specific_humidity_lev27",
+        "coefficient": 0.04042178392410278,
+        "abs_coefficient": 0.04042178392410278
+      },
+      {
+        "feature": "specific_humidity_lev21",
+        "coefficient": -0.03878621757030487,
+        "abs_coefficient": 0.03878621757030487
+      },
+      {
+        "feature": "specific_humidity_lev25",
+        "coefficient": -0.031830862164497375,
+        "abs_coefficient": 0.031830862164497375
+      },
+      {
+        "feature": "specific_humidity_lev18",
+        "coefficient": -0.030975403264164925,
+        "abs_coefficient": 0.030975403264164925
+      },
+      {
+        "feature": "specific_humidity_lev24",
+        "coefficient": -0.02532038278877735,
+        "abs_coefficient": 0.02532038278877735
+      },
+      {
+        "feature": "vertical_velocity_lev24",
+        "coefficient": -0.023299090564250946,
+        "abs_coefficient": 0.023299090564250946
+      },
+      {
+        "feature": "total_precipitation_6hr",
+        "coefficient": 0.011246051639318466,
+        "abs_coefficient": 0.011246051639318466
+      },
+      {
+        "feature": "vertical_velocity_lev23",
+        "coefficient": 0.0050059473142027855,
+        "abs_coefficient": 0.0050059473142027855
+      },
+      {
+        "feature": "specific_humidity_lev23",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      }
+    ],
+    "ranked_features_raw": [
+      {
+        "feature": "specific_humidity_lev14",
+        "coefficient": 13932.99609375,
+        "abs_coefficient": 13932.99609375
+      },
+      {
+        "feature": "specific_humidity_lev15",
+        "coefficient": -4066.945556640625,
+        "abs_coefficient": 4066.945556640625
+      },
+      {
+        "feature": "specific_humidity_lev16",
+        "coefficient": 2103.264404296875,
+        "abs_coefficient": 2103.264404296875
+      },
+      {
+        "feature": "specific_humidity_lev17",
+        "coefficient": 1069.6990966796875,
+        "abs_coefficient": 1069.6990966796875
+      },
+      {
+        "feature": "specific_humidity_lev31",
+        "coefficient": 1052.7967529296875,
+        "abs_coefficient": 1052.7967529296875
+      },
+      {
+        "feature": "specific_humidity_lev28",
+        "coefficient": -798.5504760742188,
+        "abs_coefficient": 798.5504760742188
+      },
+      {
+        "feature": "specific_humidity_lev19",
+        "coefficient": -388.63507080078125,
+        "abs_coefficient": 388.63507080078125
+      },
+      {
+        "feature": "specific_humidity_lev26",
+        "coefficient": -375.62860107421875,
+        "abs_coefficient": 375.62860107421875
+      },
+      {
+        "feature": "specific_humidity_lev18",
+        "coefficient": -351.0104064941406,
+        "abs_coefficient": 351.0104064941406
+      },
+      {
+        "feature": "specific_humidity_lev30",
+        "coefficient": -315.25006103515625,
+        "abs_coefficient": 315.25006103515625
+      },
+      {
+        "feature": "specific_humidity_lev29",
+        "coefficient": -308.46429443359375,
+        "abs_coefficient": 308.46429443359375
+      },
+      {
+        "feature": "specific_humidity_lev20",
+        "coefficient": -261.0922546386719,
+        "abs_coefficient": 261.0922546386719
+      },
+      {
+        "feature": "specific_humidity_lev22",
+        "coefficient": -207.1025390625,
+        "abs_coefficient": 207.1025390625
+      },
+      {
+        "feature": "specific_humidity_lev21",
+        "coefficient": -129.86480712890625,
+        "abs_coefficient": 129.86480712890625
+      },
+      {
+        "feature": "specific_humidity_lev25",
+        "coefficient": -47.178863525390625,
+        "abs_coefficient": 47.178863525390625
+      },
+      {
+        "feature": "specific_humidity_lev27",
+        "coefficient": 46.79744338989258,
+        "abs_coefficient": 46.79744338989258
+      },
+      {
+        "feature": "specific_humidity_lev24",
+        "coefficient": -44.78784942626953,
+        "abs_coefficient": 44.78784942626953
+      },
+      {
+        "feature": "total_precipitation_6hr",
+        "coefficient": 25.6003360748291,
+        "abs_coefficient": 25.6003360748291
+      },
+      {
+        "feature": "vertical_velocity_lev25",
+        "coefficient": 1.3693383932113647,
+        "abs_coefficient": 1.3693383932113647
+      },
+      {
+        "feature": "vertical_velocity_lev24",
+        "coefficient": -0.572508692741394,
+        "abs_coefficient": 0.572508692741394
+      },
+      {
+        "feature": "vertical_velocity_lev23",
+        "coefficient": 0.1226087287068367,
+        "abs_coefficient": 0.1226087287068367
+      },
+      {
+        "feature": "geopotential_lev32",
+        "coefficient": -0.027408363297581673,
+        "abs_coefficient": 0.027408363297581673
+      },
+      {
+        "feature": "geopotential_lev30",
+        "coefficient": 0.02667679265141487,
+        "abs_coefficient": 0.02667679265141487
+      },
+      {
+        "feature": "geopotential_lev35",
+        "coefficient": 0.02264142595231533,
+        "abs_coefficient": 0.02264142595231533
+      },
+      {
+        "feature": "geopotential_lev33",
+        "coefficient": -0.014951864257454872,
+        "abs_coefficient": 0.014951864257454872
+      },
+      {
+        "feature": "geopotential_lev34",
+        "coefficient": 0.009418416768312454,
+        "abs_coefficient": 0.009418416768312454
+      },
+      {
+        "feature": "geopotential_lev31",
+        "coefficient": -0.008572914637625217,
+        "abs_coefficient": 0.008572914637625217
+      },
+      {
+        "feature": "geopotential_lev36",
+        "coefficient": -0.0062627471052110195,
+        "abs_coefficient": 0.0062627471052110195
+      },
+      {
+        "feature": "mean_sea_level_pressure",
+        "coefficient": -0.00047564817941747606,
+        "abs_coefficient": 0.00047564817941747606
+      },
+      {
+        "feature": "specific_humidity_lev23",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      }
+    ],
+    "coef_standardized": {
+      "specific_humidity_lev26": -0.29987862706184387,
+      "specific_humidity_lev25": -0.031830862164497375,
+      "specific_humidity_lev27": 0.04042178392410278,
+      "specific_humidity_lev24": -0.02532038278877735,
+      "specific_humidity_lev28": -0.7421820759773254,
+      "specific_humidity_lev23": -0.0,
+      "specific_humidity_lev22": -0.08071058243513107,
+      "specific_humidity_lev21": -0.03878621757030487,
+      "specific_humidity_lev29": -0.30666980147361755,
+      "specific_humidity_lev20": -0.05605393648147583,
+      "specific_humidity_lev19": -0.05611678212881088,
+      "mean_sea_level_pressure": -0.171706423163414,
+      "geopotential_lev36": -1.8202766180038452,
+      "geopotential_lev35": 6.839714050292969,
+      "specific_humidity_lev18": -0.030975403264164925,
+      "specific_humidity_lev30": -0.3342435956001282,
+      "geopotential_lev34": 2.9755430221557617,
+      "total_precipitation_6hr": 0.011246051639318466,
+      "specific_humidity_lev17": 0.05005423724651337,
+      "geopotential_lev33": -4.964625835418701,
+      "specific_humidity_lev16": 0.04297421872615814,
+      "geopotential_lev32": -9.600269317626953,
+      "specific_humidity_lev15": -0.04900357499718666,
+      "specific_humidity_lev31": 1.1897900104522705,
+      "specific_humidity_lev14": 0.08771825581789017,
+      "geopotential_lev31": -3.1760146617889404,
+      "vertical_velocity_lev24": -0.023299090564250946,
+      "vertical_velocity_lev25": 0.05516667291522026,
+      "vertical_velocity_lev23": 0.0050059473142027855,
+      "geopotential_lev30": 10.471997261047363
+    },
+    "coef_raw": {
+      "specific_humidity_lev26": -375.62860107421875,
+      "specific_humidity_lev25": -47.178863525390625,
+      "specific_humidity_lev27": 46.79744338989258,
+      "specific_humidity_lev24": -44.78784942626953,
+      "specific_humidity_lev28": -798.5504760742188,
+      "specific_humidity_lev23": -0.0,
+      "specific_humidity_lev22": -207.1025390625,
+      "specific_humidity_lev21": -129.86480712890625,
+      "specific_humidity_lev29": -308.46429443359375,
+      "specific_humidity_lev20": -261.0922546386719,
+      "specific_humidity_lev19": -388.63507080078125,
+      "mean_sea_level_pressure": -0.00047564817941747606,
+      "geopotential_lev36": -0.0062627471052110195,
+      "geopotential_lev35": 0.02264142595231533,
+      "specific_humidity_lev18": -351.0104064941406,
+      "specific_humidity_lev30": -315.25006103515625,
+      "geopotential_lev34": 0.009418416768312454,
+      "total_precipitation_6hr": 25.6003360748291,
+      "specific_humidity_lev17": 1069.6990966796875,
+      "geopotential_lev33": -0.014951864257454872,
+      "specific_humidity_lev16": 2103.264404296875,
+      "geopotential_lev32": -0.027408363297581673,
+      "specific_humidity_lev15": -4066.945556640625,
+      "specific_humidity_lev31": 1052.7967529296875,
+      "specific_humidity_lev14": 13932.99609375,
+      "geopotential_lev31": -0.008572914637625217,
+      "vertical_velocity_lev24": -0.572508692741394,
+      "vertical_velocity_lev25": 1.3693383932113647,
+      "vertical_velocity_lev23": 0.1226087287068367,
+      "geopotential_lev30": 0.02667679265141487
+    },
+    "intercept_raw": 34.12573346019047,
+    "field_importance": [
+      {
+        "field": "geopotential",
+        "abs_weight_sum": 39.848440766334534
+      },
+      {
+        "field": "specific_humidity",
+        "abs_weight_sum": 3.462730348110199
+      },
+      {
+        "field": "mean_sea_level_pressure",
+        "abs_weight_sum": 0.171706423163414
+      },
+      {
+        "field": "vertical_velocity",
+        "abs_weight_sum": 0.08347171079367399
+      },
+      {
+        "field": "total_precipitation_6hr",
+        "abs_weight_sum": 0.011246051639318466
+      }
+    ],
+    "field_importance_raw": [
+      {
+        "field": "specific_humidity",
+        "abs_weight_sum": 25500.064571380615
+      },
+      {
+        "field": "total_precipitation_6hr",
+        "abs_weight_sum": 25.6003360748291
+      },
+      {
+        "field": "vertical_velocity",
+        "abs_weight_sum": 2.0644558146595955
+      },
+      {
+        "field": "geopotential",
+        "abs_weight_sum": 0.11593252466991544
+      },
+      {
+        "field": "mean_sea_level_pressure",
+        "abs_weight_sum": 0.00047564817941747606
+      }
+    ],
+    "vertical_band_importance": [
+      {
+        "band": "upper",
+        "abs_weight_sum": 41.37247437238693
+      },
+      {
+        "band": "mid",
+        "abs_weight_sum": 1.5297752441838384
+      },
+      {
+        "band": "lower",
+        "abs_weight_sum": 0.4923932086676359
+      },
+      {
+        "band": "static",
+        "abs_weight_sum": 0.18295247480273247
+      }
+    ],
+    "vertical_band_importance_raw": [
+      {
+        "band": "lower",
+        "abs_weight_sum": 22510.610229492188
+      },
+      {
+        "band": "mid",
+        "abs_weight_sum": 1623.4719837382436
+      },
+      {
+        "band": "upper",
+        "abs_weight_sum": 1368.1627464895137
+      },
+      {
+        "band": "static",
+        "abs_weight_sum": 25.60081172300852
+      }
+    ],
+    "n_train_samples": 11141349,
+    "n_val_samples": 2730442
+  },
+  "PC_3": {
+    "pc_name": "PC_3",
+    "selected_features": [
+      "temperature_lev10",
+      "temperature_lev11",
+      "temperature_lev12",
+      "temperature_lev09",
+      "temperature_lev17",
+      "temperature_lev18",
+      "temperature_lev19",
+      "specific_humidity_lev12",
+      "temperature_lev20",
+      "u_component_of_wind_lev32",
+      "u_component_of_wind_lev31",
+      "u_component_of_wind_lev33",
+      "u_component_of_wind_lev30",
+      "u_component_of_wind_lev34",
+      "temperature_lev21",
+      "u_component_of_wind_lev29",
+      "u_component_of_wind_lev35",
+      "specific_humidity_lev04",
+      "specific_humidity_lev03",
+      "u_component_of_wind_lev36",
+      "u_component_of_wind_lev28",
+      "specific_humidity_lev13",
+      "10m_u_component_of_wind",
+      "temperature_lev22",
+      "temperature_lev16",
+      "u_component_of_wind_lev27",
+      "specific_humidity_lev05",
+      "specific_humidity_lev11",
+      "temperature_lev23",
+      "specific_humidity_lev36"
+    ],
+    "model_type": "ElasticNet",
+    "alpha": 0.0001,
+    "l1_ratio": 0.7,
+    "val_r2": 0.5509554743766785,
+    "ranked_features_standardized": [
+      {
+        "feature": "u_component_of_wind_lev36",
+        "coefficient": -0.7528463006019592,
+        "abs_coefficient": 0.7528463006019592
+      },
+      {
+        "feature": "temperature_lev22",
+        "coefficient": -0.6973719000816345,
+        "abs_coefficient": 0.6973719000816345
+      },
+      {
+        "feature": "10m_u_component_of_wind",
+        "coefficient": 0.5422624945640564,
+        "abs_coefficient": 0.5422624945640564
+      },
+      {
+        "feature": "temperature_lev10",
+        "coefficient": -0.4137157201766968,
+        "abs_coefficient": 0.4137157201766968
+      },
+      {
+        "feature": "specific_humidity_lev36",
+        "coefficient": -0.38421860337257385,
+        "abs_coefficient": 0.38421860337257385
+      },
+      {
+        "feature": "temperature_lev18",
+        "coefficient": 0.3787820339202881,
+        "abs_coefficient": 0.3787820339202881
+      },
+      {
+        "feature": "temperature_lev19",
+        "coefficient": 0.34622907638549805,
+        "abs_coefficient": 0.34622907638549805
+      },
+      {
+        "feature": "temperature_lev09",
+        "coefficient": 0.3212769627571106,
+        "abs_coefficient": 0.3212769627571106
+      },
+      {
+        "feature": "u_component_of_wind_lev27",
+        "coefficient": 0.28890684247016907,
+        "abs_coefficient": 0.28890684247016907
+      },
+      {
+        "feature": "temperature_lev12",
+        "coefficient": -0.2415882647037506,
+        "abs_coefficient": 0.2415882647037506
+      },
+      {
+        "feature": "temperature_lev16",
+        "coefficient": 0.20659567415714264,
+        "abs_coefficient": 0.20659567415714264
+      },
+      {
+        "feature": "u_component_of_wind_lev28",
+        "coefficient": -0.19884954392910004,
+        "abs_coefficient": 0.19884954392910004
+      },
+      {
+        "feature": "u_component_of_wind_lev33",
+        "coefficient": -0.19683681428432465,
+        "abs_coefficient": 0.19683681428432465
+      },
+      {
+        "feature": "u_component_of_wind_lev35",
+        "coefficient": 0.19227075576782227,
+        "abs_coefficient": 0.19227075576782227
+      },
+      {
+        "feature": "temperature_lev11",
+        "coefficient": -0.17423246800899506,
+        "abs_coefficient": 0.17423246800899506
+      },
+      {
+        "feature": "temperature_lev20",
+        "coefficient": 0.16726091504096985,
+        "abs_coefficient": 0.16726091504096985
+      },
+      {
+        "feature": "u_component_of_wind_lev30",
+        "coefficient": -0.15416310727596283,
+        "abs_coefficient": 0.15416310727596283
+      },
+      {
+        "feature": "temperature_lev17",
+        "coefficient": 0.14269961416721344,
+        "abs_coefficient": 0.14269961416721344
+      },
+      {
+        "feature": "specific_humidity_lev13",
+        "coefficient": -0.10764861106872559,
+        "abs_coefficient": 0.10764861106872559
+      },
+      {
+        "feature": "temperature_lev23",
+        "coefficient": -0.09673158079385757,
+        "abs_coefficient": 0.09673158079385757
+      },
+      {
+        "feature": "specific_humidity_lev12",
+        "coefficient": 0.0791085958480835,
+        "abs_coefficient": 0.0791085958480835
+      },
+      {
+        "feature": "temperature_lev21",
+        "coefficient": 0.06728821247816086,
+        "abs_coefficient": 0.06728821247816086
+      },
+      {
+        "feature": "specific_humidity_lev04",
+        "coefficient": -0.03521091490983963,
+        "abs_coefficient": 0.03521091490983963
+      },
+      {
+        "feature": "specific_humidity_lev11",
+        "coefficient": -0.027981605380773544,
+        "abs_coefficient": 0.027981605380773544
+      },
+      {
+        "feature": "specific_humidity_lev03",
+        "coefficient": -0.018107516691088676,
+        "abs_coefficient": 0.018107516691088676
+      },
+      {
+        "feature": "u_component_of_wind_lev34",
+        "coefficient": 0.016986697912216187,
+        "abs_coefficient": 0.016986697912216187
+      },
+      {
+        "feature": "specific_humidity_lev05",
+        "coefficient": 0.012330243363976479,
+        "abs_coefficient": 0.012330243363976479
+      },
+      {
+        "feature": "u_component_of_wind_lev31",
+        "coefficient": -0.004879752639681101,
+        "abs_coefficient": 0.004879752639681101
+      },
+      {
+        "feature": "u_component_of_wind_lev29",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "u_component_of_wind_lev32",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      }
+    ],
+    "ranked_features_raw": [
+      {
+        "feature": "specific_humidity_lev04",
+        "coefficient": -417938.25,
+        "abs_coefficient": 417938.25
+      },
+      {
+        "feature": "specific_humidity_lev03",
+        "coefficient": -231049.921875,
+        "abs_coefficient": 231049.921875
+      },
+      {
+        "feature": "specific_humidity_lev05",
+        "coefficient": 146758.640625,
+        "abs_coefficient": 146758.640625
+      },
+      {
+        "feature": "specific_humidity_lev11",
+        "coefficient": -74521.53125,
+        "abs_coefficient": 74521.53125
+      },
+      {
+        "feature": "specific_humidity_lev12",
+        "coefficient": 68355.140625,
+        "abs_coefficient": 68355.140625
+      },
+      {
+        "feature": "specific_humidity_lev13",
+        "coefficient": -35371.05859375,
+        "abs_coefficient": 35371.05859375
+      },
+      {
+        "feature": "specific_humidity_lev36",
+        "coefficient": -236.78829956054688,
+        "abs_coefficient": 236.78829956054688
+      },
+      {
+        "feature": "u_component_of_wind_lev36",
+        "coefficient": -0.43596595525741577,
+        "abs_coefficient": 0.43596595525741577
+      },
+      {
+        "feature": "10m_u_component_of_wind",
+        "coefficient": 0.34842410683631897,
+        "abs_coefficient": 0.34842410683631897
+      },
+      {
+        "feature": "temperature_lev22",
+        "coefficient": -0.1982051581144333,
+        "abs_coefficient": 0.1982051581144333
+      },
+      {
+        "feature": "temperature_lev10",
+        "coefficient": -0.12480293959379196,
+        "abs_coefficient": 0.12480293959379196
+      },
+      {
+        "feature": "u_component_of_wind_lev27",
+        "coefficient": 0.11885180324316025,
+        "abs_coefficient": 0.11885180324316025
+      },
+      {
+        "feature": "temperature_lev18",
+        "coefficient": 0.11464931815862656,
+        "abs_coefficient": 0.11464931815862656
+      },
+      {
+        "feature": "temperature_lev09",
+        "coefficient": 0.10799314081668854,
+        "abs_coefficient": 0.10799314081668854
+      },
+      {
+        "feature": "temperature_lev12",
+        "coefficient": -0.10246260464191437,
+        "abs_coefficient": 0.10246260464191437
+      },
+      {
+        "feature": "temperature_lev19",
+        "coefficient": 0.10036706924438477,
+        "abs_coefficient": 0.10036706924438477
+      },
+      {
+        "feature": "u_component_of_wind_lev35",
+        "coefficient": 0.09754080325365067,
+        "abs_coefficient": 0.09754080325365067
+      },
+      {
+        "feature": "u_component_of_wind_lev33",
+        "coefficient": -0.08764756470918655,
+        "abs_coefficient": 0.08764756470918655
+      },
+      {
+        "feature": "temperature_lev16",
+        "coefficient": 0.08745376020669937,
+        "abs_coefficient": 0.08745376020669937
+      },
+      {
+        "feature": "u_component_of_wind_lev28",
+        "coefficient": -0.08328259736299515,
+        "abs_coefficient": 0.08328259736299515
+      },
+      {
+        "feature": "u_component_of_wind_lev30",
+        "coefficient": -0.06622593104839325,
+        "abs_coefficient": 0.06622593104839325
+      },
+      {
+        "feature": "temperature_lev11",
+        "coefficient": -0.06046619638800621,
+        "abs_coefficient": 0.06046619638800621
+      },
+      {
+        "feature": "temperature_lev17",
+        "coefficient": 0.04824092611670494,
+        "abs_coefficient": 0.04824092611670494
+      },
+      {
+        "feature": "temperature_lev20",
+        "coefficient": 0.04781597480177879,
+        "abs_coefficient": 0.04781597480177879
+      },
+      {
+        "feature": "temperature_lev23",
+        "coefficient": -0.02697494812309742,
+        "abs_coefficient": 0.02697494812309742
+      },
+      {
+        "feature": "temperature_lev21",
+        "coefficient": 0.01919270120561123,
+        "abs_coefficient": 0.01919270120561123
+      },
+      {
+        "feature": "u_component_of_wind_lev34",
+        "coefficient": 0.007891722023487091,
+        "abs_coefficient": 0.007891722023487091
+      },
+      {
+        "feature": "u_component_of_wind_lev31",
+        "coefficient": -0.0021135101560503244,
+        "abs_coefficient": 0.0021135101560503244
+      },
+      {
+        "feature": "u_component_of_wind_lev29",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "u_component_of_wind_lev32",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      }
+    ],
+    "coef_standardized": {
+      "temperature_lev10": -0.4137157201766968,
+      "temperature_lev11": -0.17423246800899506,
+      "temperature_lev12": -0.2415882647037506,
+      "temperature_lev09": 0.3212769627571106,
+      "temperature_lev17": 0.14269961416721344,
+      "temperature_lev18": 0.3787820339202881,
+      "temperature_lev19": 0.34622907638549805,
+      "specific_humidity_lev12": 0.0791085958480835,
+      "temperature_lev20": 0.16726091504096985,
+      "u_component_of_wind_lev32": -0.0,
+      "u_component_of_wind_lev31": -0.004879752639681101,
+      "u_component_of_wind_lev33": -0.19683681428432465,
+      "u_component_of_wind_lev30": -0.15416310727596283,
+      "u_component_of_wind_lev34": 0.016986697912216187,
+      "temperature_lev21": 0.06728821247816086,
+      "u_component_of_wind_lev29": -0.0,
+      "u_component_of_wind_lev35": 0.19227075576782227,
+      "specific_humidity_lev04": -0.03521091490983963,
+      "specific_humidity_lev03": -0.018107516691088676,
+      "u_component_of_wind_lev36": -0.7528463006019592,
+      "u_component_of_wind_lev28": -0.19884954392910004,
+      "specific_humidity_lev13": -0.10764861106872559,
+      "10m_u_component_of_wind": 0.5422624945640564,
+      "temperature_lev22": -0.6973719000816345,
+      "temperature_lev16": 0.20659567415714264,
+      "u_component_of_wind_lev27": 0.28890684247016907,
+      "specific_humidity_lev05": 0.012330243363976479,
+      "specific_humidity_lev11": -0.027981605380773544,
+      "temperature_lev23": -0.09673158079385757,
+      "specific_humidity_lev36": -0.38421860337257385
+    },
+    "coef_raw": {
+      "temperature_lev10": -0.12480293959379196,
+      "temperature_lev11": -0.06046619638800621,
+      "temperature_lev12": -0.10246260464191437,
+      "temperature_lev09": 0.10799314081668854,
+      "temperature_lev17": 0.04824092611670494,
+      "temperature_lev18": 0.11464931815862656,
+      "temperature_lev19": 0.10036706924438477,
+      "specific_humidity_lev12": 68355.140625,
+      "temperature_lev20": 0.04781597480177879,
+      "u_component_of_wind_lev32": -0.0,
+      "u_component_of_wind_lev31": -0.0021135101560503244,
+      "u_component_of_wind_lev33": -0.08764756470918655,
+      "u_component_of_wind_lev30": -0.06622593104839325,
+      "u_component_of_wind_lev34": 0.007891722023487091,
+      "temperature_lev21": 0.01919270120561123,
+      "u_component_of_wind_lev29": -0.0,
+      "u_component_of_wind_lev35": 0.09754080325365067,
+      "specific_humidity_lev04": -417938.25,
+      "specific_humidity_lev03": -231049.921875,
+      "u_component_of_wind_lev36": -0.43596595525741577,
+      "u_component_of_wind_lev28": -0.08328259736299515,
+      "specific_humidity_lev13": -35371.05859375,
+      "10m_u_component_of_wind": 0.34842410683631897,
+      "temperature_lev22": -0.1982051581144333,
+      "temperature_lev16": 0.08745376020669937,
+      "u_component_of_wind_lev27": 0.11885180324316025,
+      "specific_humidity_lev05": 146758.640625,
+      "specific_humidity_lev11": -74521.53125,
+      "temperature_lev23": -0.02697494812309742,
+      "specific_humidity_lev36": -236.78829956054688
+    },
+    "intercept_raw": 0.3974122358319776,
+    "field_importance": [
+      {
+        "field": "temperature",
+        "abs_weight_sum": 3.253772422671318
+      },
+      {
+        "field": "u_component_of_wind",
+        "abs_weight_sum": 1.8057398148812354
+      },
+      {
+        "field": "specific_humidity",
+        "abs_weight_sum": 0.6646060906350613
+      },
+      {
+        "field": "10m_u_component_of_wind",
+        "abs_weight_sum": 0.5422624945640564
+      }
+    ],
+    "field_importance_raw": [
+      {
+        "field": "specific_humidity",
+        "abs_weight_sum": 974231.3312683105
+      },
+      {
+        "field": "temperature",
+        "abs_weight_sum": 1.0386247374117374
+      },
+      {
+        "field": "u_component_of_wind",
+        "abs_weight_sum": 0.899519887054339
+      },
+      {
+        "field": "10m_u_component_of_wind",
+        "abs_weight_sum": 0.34842410683631897
+      }
+    ],
+    "vertical_band_importance": [
+      {
+        "band": "mid",
+        "abs_weight_sum": 2.6983640044927597
+      },
+      {
+        "band": "upper",
+        "abs_weight_sum": 1.70220203185454
+      },
+      {
+        "band": "lower",
+        "abs_weight_sum": 1.3235522918403149
+      },
+      {
+        "band": "static",
+        "abs_weight_sum": 0.5422624945640564
+      }
+    ],
+    "vertical_band_importance_raw": [
+      {
+        "band": "lower",
+        "abs_weight_sum": 938623.8800998814
+      },
+      {
+        "band": "mid",
+        "abs_weight_sum": 35371.90362800658
+      },
+      {
+        "band": "upper",
+        "abs_weight_sum": 237.48568504699506
+      },
+      {
+        "band": "static",
+        "abs_weight_sum": 0.34842410683631897
+      }
+    ],
+    "n_train_samples": 11141349,
+    "n_val_samples": 2730442
+  },
+  "PC_4": {
+    "pc_name": "PC_4",
+    "selected_features": [
+      "temperature_lev03",
+      "temperature_lev02",
+      "temperature_lev04",
+      "geopotential_lev00",
+      "temperature_lev01",
+      "temperature_lev05",
+      "u_component_of_wind_lev00",
+      "geopotential_lev01",
+      "temperature_lev06",
+      "geopotential_lev02",
+      "temperature_lev00",
+      "geopotential_lev03",
+      "temperature_lev07",
+      "u_component_of_wind_lev01",
+      "geopotential_lev04",
+      "geopotential_lev05",
+      "u_component_of_wind_lev02",
+      "geopotential_lev06",
+      "specific_humidity_lev08",
+      "geopotential_lev07",
+      "u_component_of_wind_lev03",
+      "temperature_lev08",
+      "u_component_of_wind_lev04",
+      "geopotential_lev08",
+      "geopotential_lev36",
+      "u_component_of_wind_lev05",
+      "geopotential_lev35",
+      "temperature_lev14",
+      "mean_sea_level_pressure",
+      "geopotential_lev34"
+    ],
+    "model_type": "ElasticNet",
+    "alpha": 0.0001,
+    "l1_ratio": 0.7,
+    "val_r2": 0.05827367305755615,
+    "ranked_features_standardized": [
+      {
+        "feature": "geopotential_lev35",
+        "coefficient": -5.751763820648193,
+        "abs_coefficient": 5.751763820648193
+      },
+      {
+        "feature": "geopotential_lev36",
+        "coefficient": 5.748879432678223,
+        "abs_coefficient": 5.748879432678223
+      },
+      {
+        "feature": "geopotential_lev08",
+        "coefficient": 2.399472236633301,
+        "abs_coefficient": 2.399472236633301
+      },
+      {
+        "feature": "geopotential_lev07",
+        "coefficient": -0.9522920250892639,
+        "abs_coefficient": 0.9522920250892639
+      },
+      {
+        "feature": "geopotential_lev06",
+        "coefficient": -0.867918074131012,
+        "abs_coefficient": 0.867918074131012
+      },
+      {
+        "feature": "u_component_of_wind_lev05",
+        "coefficient": -0.3491724729537964,
+        "abs_coefficient": 0.3491724729537964
+      },
+      {
+        "feature": "temperature_lev14",
+        "coefficient": -0.3099520206451416,
+        "abs_coefficient": 0.3099520206451416
+      },
+      {
+        "feature": "specific_humidity_lev08",
+        "coefficient": 0.25846216082572937,
+        "abs_coefficient": 0.25846216082572937
+      },
+      {
+        "feature": "geopotential_lev00",
+        "coefficient": -0.2513202726840973,
+        "abs_coefficient": 0.2513202726840973
+      },
+      {
+        "feature": "mean_sea_level_pressure",
+        "coefficient": -0.19294047355651855,
+        "abs_coefficient": 0.19294047355651855
+      },
+      {
+        "feature": "u_component_of_wind_lev00",
+        "coefficient": -0.16925407946109772,
+        "abs_coefficient": 0.16925407946109772
+      },
+      {
+        "feature": "temperature_lev07",
+        "coefficient": -0.13829857110977173,
+        "abs_coefficient": 0.13829857110977173
+      },
+      {
+        "feature": "temperature_lev08",
+        "coefficient": 0.11625467985868454,
+        "abs_coefficient": 0.11625467985868454
+      },
+      {
+        "feature": "temperature_lev05",
+        "coefficient": 0.11362332850694656,
+        "abs_coefficient": 0.11362332850694656
+      },
+      {
+        "feature": "u_component_of_wind_lev04",
+        "coefficient": 0.11230417340993881,
+        "abs_coefficient": 0.11230417340993881
+      },
+      {
+        "feature": "temperature_lev03",
+        "coefficient": 0.08147361129522324,
+        "abs_coefficient": 0.08147361129522324
+      },
+      {
+        "feature": "temperature_lev00",
+        "coefficient": 0.07869715988636017,
+        "abs_coefficient": 0.07869715988636017
+      },
+      {
+        "feature": "temperature_lev01",
+        "coefficient": 0.07446223497390747,
+        "abs_coefficient": 0.07446223497390747
+      },
+      {
+        "feature": "u_component_of_wind_lev02",
+        "coefficient": 0.05657186359167099,
+        "abs_coefficient": 0.05657186359167099
+      },
+      {
+        "feature": "temperature_lev06",
+        "coefficient": -0.05651521310210228,
+        "abs_coefficient": 0.05651521310210228
+      },
+      {
+        "feature": "temperature_lev04",
+        "coefficient": 0.05080260708928108,
+        "abs_coefficient": 0.05080260708928108
+      },
+      {
+        "feature": "u_component_of_wind_lev03",
+        "coefficient": 0.012971572577953339,
+        "abs_coefficient": 0.012971572577953339
+      },
+      {
+        "feature": "u_component_of_wind_lev01",
+        "coefficient": -0.005466568283736706,
+        "abs_coefficient": 0.005466568283736706
+      },
+      {
+        "feature": "geopotential_lev01",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev02",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev03",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev04",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev05",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev34",
+        "coefficient": 0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "temperature_lev02",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      }
+    ],
+    "ranked_features_raw": [
+      {
+        "feature": "specific_humidity_lev08",
+        "coefficient": 2921425.75,
+        "abs_coefficient": 2921425.75
+      },
+      {
+        "feature": "temperature_lev14",
+        "coefficient": -0.17796792089939117,
+        "abs_coefficient": 0.17796792089939117
+      },
+      {
+        "feature": "temperature_lev07",
+        "coefficient": -0.0570264533162117,
+        "abs_coefficient": 0.0570264533162117
+      },
+      {
+        "feature": "temperature_lev08",
+        "coefficient": 0.04940817505121231,
+        "abs_coefficient": 0.04940817505121231
+      },
+      {
+        "feature": "u_component_of_wind_lev05",
+        "coefficient": -0.04828406870365143,
+        "abs_coefficient": 0.04828406870365143
+      },
+      {
+        "feature": "temperature_lev05",
+        "coefficient": 0.03829189017415047,
+        "abs_coefficient": 0.03829189017415047
+      },
+      {
+        "feature": "temperature_lev00",
+        "coefficient": 0.027903279289603233,
+        "abs_coefficient": 0.027903279289603233
+      },
+      {
+        "feature": "temperature_lev03",
+        "coefficient": 0.025075344368815422,
+        "abs_coefficient": 0.025075344368815422
+      },
+      {
+        "feature": "temperature_lev06",
+        "coefficient": -0.021402619779109955,
+        "abs_coefficient": 0.021402619779109955
+      },
+      {
+        "feature": "temperature_lev01",
+        "coefficient": 0.020853152498602867,
+        "abs_coefficient": 0.020853152498602867
+      },
+      {
+        "feature": "geopotential_lev36",
+        "coefficient": 0.02040739543735981,
+        "abs_coefficient": 0.02040739543735981
+      },
+      {
+        "feature": "geopotential_lev35",
+        "coefficient": -0.01964462548494339,
+        "abs_coefficient": 0.01964462548494339
+      },
+      {
+        "feature": "u_component_of_wind_lev00",
+        "coefficient": -0.01670895889401436,
+        "abs_coefficient": 0.01670895889401436
+      },
+      {
+        "feature": "temperature_lev04",
+        "coefficient": 0.01640591397881508,
+        "abs_coefficient": 0.01640591397881508
+      },
+      {
+        "feature": "u_component_of_wind_lev04",
+        "coefficient": 0.014797534793615341,
+        "abs_coefficient": 0.014797534793615341
+      },
+      {
+        "feature": "u_component_of_wind_lev02",
+        "coefficient": 0.006722836755216122,
+        "abs_coefficient": 0.006722836755216122
+      },
+      {
+        "feature": "u_component_of_wind_lev03",
+        "coefficient": 0.0016456173034384847,
+        "abs_coefficient": 0.0016456173034384847
+      },
+      {
+        "feature": "geopotential_lev08",
+        "coefficient": 0.0016379175940528512,
+        "abs_coefficient": 0.0016379175940528512
+      },
+      {
+        "feature": "u_component_of_wind_lev01",
+        "coefficient": -0.0006061539752408862,
+        "abs_coefficient": 0.0006061539752408862
+      },
+      {
+        "feature": "mean_sea_level_pressure",
+        "coefficient": -0.0005514416261576116,
+        "abs_coefficient": 0.0005514416261576116
+      },
+      {
+        "feature": "geopotential_lev07",
+        "coefficient": -0.0005501257837750018,
+        "abs_coefficient": 0.0005501257837750018
+      },
+      {
+        "feature": "geopotential_lev06",
+        "coefficient": -0.0004356053250376135,
+        "abs_coefficient": 0.0004356053250376135
+      },
+      {
+        "feature": "geopotential_lev00",
+        "coefficient": -6.05323730269447e-05,
+        "abs_coefficient": 6.05323730269447e-05
+      },
+      {
+        "feature": "geopotential_lev01",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev02",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev03",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev04",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev05",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev34",
+        "coefficient": 0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "temperature_lev02",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      }
+    ],
+    "coef_standardized": {
+      "temperature_lev03": 0.08147361129522324,
+      "temperature_lev02": -0.0,
+      "temperature_lev04": 0.05080260708928108,
+      "geopotential_lev00": -0.2513202726840973,
+      "temperature_lev01": 0.07446223497390747,
+      "temperature_lev05": 0.11362332850694656,
+      "u_component_of_wind_lev00": -0.16925407946109772,
+      "geopotential_lev01": -0.0,
+      "temperature_lev06": -0.05651521310210228,
+      "geopotential_lev02": -0.0,
+      "temperature_lev00": 0.07869715988636017,
+      "geopotential_lev03": -0.0,
+      "temperature_lev07": -0.13829857110977173,
+      "u_component_of_wind_lev01": -0.005466568283736706,
+      "geopotential_lev04": -0.0,
+      "geopotential_lev05": -0.0,
+      "u_component_of_wind_lev02": 0.05657186359167099,
+      "geopotential_lev06": -0.867918074131012,
+      "specific_humidity_lev08": 0.25846216082572937,
+      "geopotential_lev07": -0.9522920250892639,
+      "u_component_of_wind_lev03": 0.012971572577953339,
+      "temperature_lev08": 0.11625467985868454,
+      "u_component_of_wind_lev04": 0.11230417340993881,
+      "geopotential_lev08": 2.399472236633301,
+      "geopotential_lev36": 5.748879432678223,
+      "u_component_of_wind_lev05": -0.3491724729537964,
+      "geopotential_lev35": -5.751763820648193,
+      "temperature_lev14": -0.3099520206451416,
+      "mean_sea_level_pressure": -0.19294047355651855,
+      "geopotential_lev34": 0.0
+    },
+    "coef_raw": {
+      "temperature_lev03": 0.025075344368815422,
+      "temperature_lev02": -0.0,
+      "temperature_lev04": 0.01640591397881508,
+      "geopotential_lev00": -6.05323730269447e-05,
+      "temperature_lev01": 0.020853152498602867,
+      "temperature_lev05": 0.03829189017415047,
+      "u_component_of_wind_lev00": -0.01670895889401436,
+      "geopotential_lev01": -0.0,
+      "temperature_lev06": -0.021402619779109955,
+      "geopotential_lev02": -0.0,
+      "temperature_lev00": 0.027903279289603233,
+      "geopotential_lev03": -0.0,
+      "temperature_lev07": -0.0570264533162117,
+      "u_component_of_wind_lev01": -0.0006061539752408862,
+      "geopotential_lev04": -0.0,
+      "geopotential_lev05": -0.0,
+      "u_component_of_wind_lev02": 0.006722836755216122,
+      "geopotential_lev06": -0.0004356053250376135,
+      "specific_humidity_lev08": 2921425.75,
+      "geopotential_lev07": -0.0005501257837750018,
+      "u_component_of_wind_lev03": 0.0016456173034384847,
+      "temperature_lev08": 0.04940817505121231,
+      "u_component_of_wind_lev04": 0.014797534793615341,
+      "geopotential_lev08": 0.0016379175940528512,
+      "geopotential_lev36": 0.02040739543735981,
+      "u_component_of_wind_lev05": -0.04828406870365143,
+      "geopotential_lev35": -0.01964462548494339,
+      "temperature_lev14": -0.17796792089939117,
+      "mean_sea_level_pressure": -0.0005514416261576116,
+      "geopotential_lev34": 0.0
+    },
+    "intercept_raw": 41.81880546098013,
+    "field_importance": [
+      {
+        "field": "geopotential",
+        "abs_weight_sum": 15.97164586186409
+      },
+      {
+        "field": "temperature",
+        "abs_weight_sum": 1.0200794264674187
+      },
+      {
+        "field": "u_component_of_wind",
+        "abs_weight_sum": 0.705740730278194
+      },
+      {
+        "field": "specific_humidity",
+        "abs_weight_sum": 0.25846216082572937
+      },
+      {
+        "field": "mean_sea_level_pressure",
+        "abs_weight_sum": 0.19294047355651855
+      }
+    ],
+    "field_importance_raw": [
+      {
+        "field": "specific_humidity",
+        "abs_weight_sum": 2921425.75
+      },
+      {
+        "field": "temperature",
+        "abs_weight_sum": 0.4343347493559122
+      },
+      {
+        "field": "u_component_of_wind",
+        "abs_weight_sum": 0.08876517042517662
+      },
+      {
+        "field": "geopotential",
+        "abs_weight_sum": 0.04273620199819561
+      },
+      {
+        "field": "mean_sea_level_pressure",
+        "abs_weight_sum": 0.0005514416261576116
+      }
+    ],
+    "vertical_band_importance": [
+      {
+        "band": "upper",
+        "abs_weight_sum": 15.675374947488308
+      },
+      {
+        "band": "mid",
+        "abs_weight_sum": 1.6447810530662537
+      },
+      {
+        "band": "lower",
+        "abs_weight_sum": 0.6357721788808703
+      },
+      {
+        "band": "static",
+        "abs_weight_sum": 0.19294047355651855
+      }
+    ],
+    "vertical_band_importance_raw": [
+      {
+        "band": "upper",
+        "abs_weight_sum": 2921426.0766426134
+      },
+      {
+        "band": "mid",
+        "abs_weight_sum": 0.1663385944266338
+      },
+      {
+        "band": "lower",
+        "abs_weight_sum": 0.07285491378570441
+      },
+      {
+        "band": "static",
+        "abs_weight_sum": 0.0005514416261576116
+      }
+    ],
+    "n_train_samples": 11141349,
+    "n_val_samples": 2730442
+  },
+  "PC_5": {
+    "pc_name": "PC_5",
+    "selected_features": [
+      "temperature_lev28",
+      "temperature_lev29",
+      "temperature_lev27",
+      "temperature_lev26",
+      "temperature_lev30",
+      "temperature_lev25",
+      "temperature_lev31",
+      "temperature_lev24",
+      "temperature_lev23",
+      "temperature_lev32",
+      "temperature_lev22",
+      "temperature_lev33",
+      "temperature_lev21",
+      "geopotential_lev19",
+      "geopotential_lev20",
+      "geopotential_lev18",
+      "temperature_lev34",
+      "geopotential_lev21",
+      "geopotential_lev17",
+      "temperature_lev20",
+      "geopotential_lev22",
+      "temperature_lev35",
+      "temperature_lev36",
+      "geopotential_lev16",
+      "geopotential_lev23",
+      "temperature_lev19",
+      "geopotential_lev15",
+      "geopotential_lev24",
+      "geopotential_lev14",
+      "specific_humidity_lev02"
+    ],
+    "model_type": "ElasticNet",
+    "alpha": 0.0001,
+    "l1_ratio": 0.7,
+    "val_r2": 0.4186520576477051,
+    "ranked_features_standardized": [
+      {
+        "feature": "geopotential_lev19",
+        "coefficient": -13.456762313842773,
+        "abs_coefficient": 13.456762313842773
+      },
+      {
+        "feature": "geopotential_lev24",
+        "coefficient": 7.300240993499756,
+        "abs_coefficient": 7.300240993499756
+      },
+      {
+        "feature": "geopotential_lev20",
+        "coefficient": -3.5025601387023926,
+        "abs_coefficient": 3.5025601387023926
+      },
+      {
+        "feature": "geopotential_lev14",
+        "coefficient": 2.824481964111328,
+        "abs_coefficient": 2.824481964111328
+      },
+      {
+        "feature": "geopotential_lev23",
+        "coefficient": 2.555521249771118,
+        "abs_coefficient": 2.555521249771118
+      },
+      {
+        "feature": "temperature_lev20",
+        "coefficient": 1.7227376699447632,
+        "abs_coefficient": 1.7227376699447632
+      },
+      {
+        "feature": "geopotential_lev18",
+        "coefficient": -1.419843316078186,
+        "abs_coefficient": 1.419843316078186
+      },
+      {
+        "feature": "temperature_lev22",
+        "coefficient": 1.3028734922409058,
+        "abs_coefficient": 1.3028734922409058
+      },
+      {
+        "feature": "temperature_lev21",
+        "coefficient": 1.268737554550171,
+        "abs_coefficient": 1.268737554550171
+      },
+      {
+        "feature": "temperature_lev32",
+        "coefficient": 0.8195804953575134,
+        "abs_coefficient": 0.8195804953575134
+      },
+      {
+        "feature": "temperature_lev28",
+        "coefficient": -0.7847892045974731,
+        "abs_coefficient": 0.7847892045974731
+      },
+      {
+        "feature": "temperature_lev24",
+        "coefficient": 0.756399393081665,
+        "abs_coefficient": 0.756399393081665
+      },
+      {
+        "feature": "temperature_lev19",
+        "coefficient": 0.7230632305145264,
+        "abs_coefficient": 0.7230632305145264
+      },
+      {
+        "feature": "temperature_lev27",
+        "coefficient": -0.7167148590087891,
+        "abs_coefficient": 0.7167148590087891
+      },
+      {
+        "feature": "geopotential_lev22",
+        "coefficient": 0.6182314157485962,
+        "abs_coefficient": 0.6182314157485962
+      },
+      {
+        "feature": "temperature_lev29",
+        "coefficient": -0.540544867515564,
+        "abs_coefficient": 0.540544867515564
+      },
+      {
+        "feature": "temperature_lev23",
+        "coefficient": 0.4700957238674164,
+        "abs_coefficient": 0.4700957238674164
+      },
+      {
+        "feature": "temperature_lev30",
+        "coefficient": -0.39977678656578064,
+        "abs_coefficient": 0.39977678656578064
+      },
+      {
+        "feature": "temperature_lev25",
+        "coefficient": 0.3907005190849304,
+        "abs_coefficient": 0.3907005190849304
+      },
+      {
+        "feature": "temperature_lev26",
+        "coefficient": 0.3640040457248688,
+        "abs_coefficient": 0.3640040457248688
+      },
+      {
+        "feature": "temperature_lev34",
+        "coefficient": -0.3327513635158539,
+        "abs_coefficient": 0.3327513635158539
+      },
+      {
+        "feature": "geopotential_lev16",
+        "coefficient": -0.31431010365486145,
+        "abs_coefficient": 0.31431010365486145
+      },
+      {
+        "feature": "temperature_lev36",
+        "coefficient": 0.24665577709674835,
+        "abs_coefficient": 0.24665577709674835
+      },
+      {
+        "feature": "specific_humidity_lev02",
+        "coefficient": 0.18405023217201233,
+        "abs_coefficient": 0.18405023217201233
+      },
+      {
+        "feature": "temperature_lev35",
+        "coefficient": 0.09028700739145279,
+        "abs_coefficient": 0.09028700739145279
+      },
+      {
+        "feature": "temperature_lev33",
+        "coefficient": 0.08782414346933365,
+        "abs_coefficient": 0.08782414346933365
+      },
+      {
+        "feature": "temperature_lev31",
+        "coefficient": 0.0017780712805688381,
+        "abs_coefficient": 0.0017780712805688381
+      },
+      {
+        "feature": "geopotential_lev15",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev17",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev21",
+        "coefficient": 0.0,
+        "abs_coefficient": 0.0
+      }
+    ],
+    "ranked_features_raw": [
+      {
+        "feature": "specific_humidity_lev02",
+        "coefficient": 2856973.75,
+        "abs_coefficient": 2856973.75
+      },
+      {
+        "feature": "temperature_lev20",
+        "coefficient": 0.49503347277641296,
+        "abs_coefficient": 0.49503347277641296
+      },
+      {
+        "feature": "temperature_lev22",
+        "coefficient": 0.37221136689186096,
+        "abs_coefficient": 0.37221136689186096
+      },
+      {
+        "feature": "temperature_lev21",
+        "coefficient": 0.3637523353099823,
+        "abs_coefficient": 0.3637523353099823
+      },
+      {
+        "feature": "temperature_lev19",
+        "coefficient": 0.2106885313987732,
+        "abs_coefficient": 0.2106885313987732
+      },
+      {
+        "feature": "temperature_lev24",
+        "coefficient": 0.20367085933685303,
+        "abs_coefficient": 0.20367085933685303
+      },
+      {
+        "feature": "temperature_lev32",
+        "coefficient": 0.1968948394060135,
+        "abs_coefficient": 0.1968948394060135
+      },
+      {
+        "feature": "temperature_lev28",
+        "coefficient": -0.19532909989356995,
+        "abs_coefficient": 0.19532909989356995
+      },
+      {
+        "feature": "temperature_lev27",
+        "coefficient": -0.18000353872776031,
+        "abs_coefficient": 0.18000353872776031
+      },
+      {
+        "feature": "temperature_lev29",
+        "coefficient": -0.13338661193847656,
+        "abs_coefficient": 0.13338661193847656
+      },
+      {
+        "feature": "temperature_lev23",
+        "coefficient": 0.13176968693733215,
+        "abs_coefficient": 0.13176968693733215
+      },
+      {
+        "feature": "temperature_lev25",
+        "coefficient": 0.10139884054660797,
+        "abs_coefficient": 0.10139884054660797
+      },
+      {
+        "feature": "temperature_lev30",
+        "coefficient": -0.09789180755615234,
+        "abs_coefficient": 0.09789180755615234
+      },
+      {
+        "feature": "temperature_lev26",
+        "coefficient": 0.09227228909730911,
+        "abs_coefficient": 0.09227228909730911
+      },
+      {
+        "feature": "temperature_lev34",
+        "coefficient": -0.07766988128423691,
+        "abs_coefficient": 0.07766988128423691
+      },
+      {
+        "feature": "temperature_lev36",
+        "coefficient": 0.05516328290104866,
+        "abs_coefficient": 0.05516328290104866
+      },
+      {
+        "feature": "temperature_lev33",
+        "coefficient": 0.020823335275053978,
+        "abs_coefficient": 0.020823335275053978
+      },
+      {
+        "feature": "temperature_lev35",
+        "coefficient": 0.020614584907889366,
+        "abs_coefficient": 0.020614584907889366
+      },
+      {
+        "feature": "geopotential_lev19",
+        "coefficient": -0.011909648776054382,
+        "abs_coefficient": 0.011909648776054382
+      },
+      {
+        "feature": "geopotential_lev24",
+        "coefficient": 0.010963850654661655,
+        "abs_coefficient": 0.010963850654661655
+      },
+      {
+        "feature": "geopotential_lev20",
+        "coefficient": -0.0034419596195220947,
+        "abs_coefficient": 0.0034419596195220947
+      },
+      {
+        "feature": "geopotential_lev23",
+        "coefficient": 0.003441739361733198,
+        "abs_coefficient": 0.003441739361733198
+      },
+      {
+        "feature": "geopotential_lev14",
+        "coefficient": 0.001778035773895681,
+        "abs_coefficient": 0.001778035773895681
+      },
+      {
+        "feature": "geopotential_lev18",
+        "coefficient": -0.0011324104852974415,
+        "abs_coefficient": 0.0011324104852974415
+      },
+      {
+        "feature": "geopotential_lev22",
+        "coefficient": 0.0007487825932912529,
+        "abs_coefficient": 0.0007487825932912529
+      },
+      {
+        "feature": "temperature_lev31",
+        "coefficient": 0.0004317747661843896,
+        "abs_coefficient": 0.0004317747661843896
+      },
+      {
+        "feature": "geopotential_lev16",
+        "coefficient": -0.00020840804791077971,
+        "abs_coefficient": 0.00020840804791077971
+      },
+      {
+        "feature": "geopotential_lev15",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev17",
+        "coefficient": -0.0,
+        "abs_coefficient": 0.0
+      },
+      {
+        "feature": "geopotential_lev21",
+        "coefficient": 0.0,
+        "abs_coefficient": 0.0
+      }
+    ],
+    "coef_standardized": {
+      "temperature_lev28": -0.7847892045974731,
+      "temperature_lev29": -0.540544867515564,
+      "temperature_lev27": -0.7167148590087891,
+      "temperature_lev26": 0.3640040457248688,
+      "temperature_lev30": -0.39977678656578064,
+      "temperature_lev25": 0.3907005190849304,
+      "temperature_lev31": 0.0017780712805688381,
+      "temperature_lev24": 0.756399393081665,
+      "temperature_lev23": 0.4700957238674164,
+      "temperature_lev32": 0.8195804953575134,
+      "temperature_lev22": 1.3028734922409058,
+      "temperature_lev33": 0.08782414346933365,
+      "temperature_lev21": 1.268737554550171,
+      "geopotential_lev19": -13.456762313842773,
+      "geopotential_lev20": -3.5025601387023926,
+      "geopotential_lev18": -1.419843316078186,
+      "temperature_lev34": -0.3327513635158539,
+      "geopotential_lev21": 0.0,
+      "geopotential_lev17": -0.0,
+      "temperature_lev20": 1.7227376699447632,
+      "geopotential_lev22": 0.6182314157485962,
+      "temperature_lev35": 0.09028700739145279,
+      "temperature_lev36": 0.24665577709674835,
+      "geopotential_lev16": -0.31431010365486145,
+      "geopotential_lev23": 2.555521249771118,
+      "temperature_lev19": 0.7230632305145264,
+      "geopotential_lev15": -0.0,
+      "geopotential_lev24": 7.300240993499756,
+      "geopotential_lev14": 2.824481964111328,
+      "specific_humidity_lev02": 0.18405023217201233
+    },
+    "coef_raw": {
+      "temperature_lev28": -0.19532909989356995,
+      "temperature_lev29": -0.13338661193847656,
+      "temperature_lev27": -0.18000353872776031,
+      "temperature_lev26": 0.09227228909730911,
+      "temperature_lev30": -0.09789180755615234,
+      "temperature_lev25": 0.10139884054660797,
+      "temperature_lev31": 0.0004317747661843896,
+      "temperature_lev24": 0.20367085933685303,
+      "temperature_lev23": 0.13176968693733215,
+      "temperature_lev32": 0.1968948394060135,
+      "temperature_lev22": 0.37221136689186096,
+      "temperature_lev33": 0.020823335275053978,
+      "temperature_lev21": 0.3637523353099823,
+      "geopotential_lev19": -0.011909648776054382,
+      "geopotential_lev20": -0.0034419596195220947,
+      "geopotential_lev18": -0.0011324104852974415,
+      "temperature_lev34": -0.07766988128423691,
+      "geopotential_lev21": 0.0,
+      "geopotential_lev17": -0.0,
+      "temperature_lev20": 0.49503347277641296,
+      "geopotential_lev22": 0.0007487825932912529,
+      "temperature_lev35": 0.020614584907889366,
+      "temperature_lev36": 0.05516328290104866,
+      "geopotential_lev16": -0.00020840804791077971,
+      "geopotential_lev23": 0.003441739361733198,
+      "temperature_lev19": 0.2106885313987732,
+      "geopotential_lev15": -0.0,
+      "geopotential_lev24": 0.010963850654661655,
+      "geopotential_lev14": 0.001778035773895681,
+      "specific_humidity_lev02": 2856973.75
+    },
+    "intercept_raw": -9.142224212082539,
+    "field_importance": [
+      {
+        "field": "geopotential",
+        "abs_weight_sum": 31.991951495409012
+      },
+      {
+        "field": "temperature",
+        "abs_weight_sum": 11.019314204808325
+      },
+      {
+        "field": "specific_humidity",
+        "abs_weight_sum": 0.18405023217201233
+      }
+    ],
+    "field_importance_raw": [
+      {
+        "field": "specific_humidity",
+        "abs_weight_sum": 2856973.75
+      },
+      {
+        "field": "temperature",
+        "abs_weight_sum": 2.9490061389515176
+      },
+      {
+        "field": "geopotential",
+        "abs_weight_sum": 0.033624835312366486
+      }
+    ],
+    "vertical_band_importance": [
+      {
+        "band": "lower",
+        "abs_weight_sum": 24.147808969020844
+      },
+      {
+        "band": "mid",
+        "abs_weight_sum": 15.743519246578217
+      },
+      {
+        "band": "upper",
+        "abs_weight_sum": 3.3039877167902887
+      }
+    ],
+    "vertical_band_importance_raw": [
+      {
+        "band": "lower",
+        "abs_weight_sum": 2856974.474192467
+      },
+      {
+        "band": "mid",
+        "abs_weight_sum": 1.460233289457392
+      },
+      {
+        "band": "upper",
+        "abs_weight_sum": 0.7982052179286256
+      }
+    ],
+    "n_train_samples": 11141349,
+    "n_val_samples": 2730442
+  }
+}

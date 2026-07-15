@@ -1,0 +1,12 @@
+all_layer_pc,best_layer8_pc,signed_cosine,abs_cosine,sign_relation
+PC1,PC1,-0.485818,0.485818,flipped_sign
+PC2,PC2,-0.650006,0.650006,flipped_sign
+PC3,PC1,0.381146,0.381146,same_sign
+PC4,PC5,-0.513378,0.513378,flipped_sign
+PC5,PC3,0.422135,0.422135,same_sign
+PC6,PC1,0.253120,0.253120,same_sign
+PC7,PC5,-0.272268,0.272268,flipped_sign
+PC8,PC7,0.462120,0.462120,same_sign
+PC9,PC11,0.327637,0.327637,same_sign
+PC10,PC6,0.413294,0.413294,same_sign
+PC11,PC9,-0.504668,0.504668,flipped_sign

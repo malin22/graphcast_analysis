@@ -1,4 +1,4 @@
-# run_graphcast_save_all_layers_jan2021.py
+# run_graphcast_save_all_layers.py
 
 #!/usr/bin/env python3
 import dataclasses
@@ -25,22 +25,35 @@ from graphcast.deep_typed_graph_net import get_activation_manager
 
 
 DATA_DIR = "/share/prj-4d/graphcast_shared/data/era5_daily_nc"
-ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activations_all_layers_January_2021"
+ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activations_all_layers_Mar_2020"
 
 # Zero-based processor layers. These save as layer0000 ... layer0015.
 SAVE_STEPS = list(range(16))
 
 CENTERS = np.arange(
-    np.datetime64("2021-01-01T00"),
-    np.datetime64("2021-02-01T00"),
+    np.datetime64("2020-02-01T00"),
+    np.datetime64("2020-03-01T00"),
     np.timedelta64(6, "h"),
 )
 
 
+# def _open_and_trim(path: str) -> xr.Dataset:
+    
+#     ds = xr.open_dataset(path)
+#     if "time" in ds.dims and ds.sizes["time"] > 4:
+#         ds = ds.isel(time=slice(0, 4))
+#     return ds
+
 def _open_and_trim(path: str) -> xr.Dataset:
-    ds = xr.open_dataset(path)
+    try:
+        ds = xr.open_dataset(path)
+    except Exception as e:
+        print(f"Skipping {path}: {e}")
+        return None
+
     if "time" in ds.dims and ds.sizes["time"] > 4:
         ds = ds.isel(time=slice(0, 4))
+
     return ds
 
 
@@ -62,8 +75,14 @@ def three_step_window(data_dir: str, center_time: str) -> xr.Dataset | None:
 
     if any(not os.path.exists(p) for p in file_paths):
         return None
-
-    daily = [_open_and_trim(p) for p in file_paths]
+    
+    daily = []
+    for p in file_paths:
+        ds = _open_and_trim(p)
+        if ds is None:
+            print(f"Skipping center time {center_time} because {p} could not be opened")
+            return None
+        daily.append(ds)
 
     var_time = [v for v, da in daily[0].data_vars.items() if "time" in da.dims]
     var_static = [v for v, da in daily[0].data_vars.items() if "time" not in da.dims]

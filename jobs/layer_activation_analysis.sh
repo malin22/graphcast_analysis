@@ -4,8 +4,8 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=64G
-#SBATCH --output=logs/layers%j.out
-#SBATCH --error=logs/layers%j.err
+#SBATCH --output=logs/savelayers%j.out
+#SBATCH --error=logs/savelayers%j.err
 
 set -euo pipefail
 
@@ -20,5 +20,6 @@ conda activate graphcast312
 
 # Run your script
 #srun python -u src/sabines_layer_experiments/save_all_layers.py
-srun python -u src/sabines_layer_experiments/layer_animation.py
+#srun python -u src/sabines_layer_experiments/layer_animation.py
+srun python -u src/sabines_layer_experiments/pc_0_8_15_sidebyside_comparison.py
 echo "Finished at: $(date)"
