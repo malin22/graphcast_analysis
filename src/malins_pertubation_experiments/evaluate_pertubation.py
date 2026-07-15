@@ -15,13 +15,19 @@ from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
 # CONFIG
 # =====================
 
-WEATHER_FEATURE = "AR"
-THRESHOLD = 0.9
-CENTER_STR = "2021-02-12T18"
+WEATHER_FEATURE = "TC"
+THRESHOLD = 0.8
+CENTER_STR = "2021-04-08T18"
 NODE_HIERARCHY_LEVEL = 6
 
 # Only generate videos for the lowest, highest, and control gamma values.
 VIDEO_GAMMA_SELECTION = [-0.5, 0.5]
+
+
+TC_RADIUS_KM = 300.0          # intensity radius
+TRACK_SEARCH_RADIUS_KM = 600.0  # search radius around previous center
+EARTH_RADIUS_KM = 6371.0
+
 
 BASE_DIR = os.path.join(
     "plots",
@@ -35,7 +41,7 @@ BASE_DIR = os.path.join(
 
 INPUT_DIR = os.path.join(BASE_DIR, "data")
 OUT_DIR = os.path.join(BASE_DIR, "evaluation")
-MASK_DIR = "/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned"
+MASK_DIR = f"/share/prj-4d/graphcast_shared/data/ClimateNetLarge/{WEATHER_FEATURE}_labels_cleaned"
 
 CONTROL_GAMMA = 0.0
 MAX_MASK_TIME_DIFFERENCE_HOURS = 3
@@ -151,6 +157,171 @@ def load_prediction(path, time_selection=None):
 # =====================
 # METEOROLOGICAL METRICS
 # =====================
+
+
+###TC Helper:
+
+def great_circle_distance(lat1, lon1, lat2, lon2):
+    lat1 = np.asarray(lat1, dtype=float)
+    lon1 = np.asarray(lon1, dtype=float)
+    lat2 = np.asarray(lat2, dtype=float)
+    lon2 = np.asarray(lon2, dtype=float)
+
+    # Wrap longitude difference to [-180, 180]
+    dlon = (lon2 - lon1 + 180.0) % 360.0 - 180.0
+
+    lat1 = np.deg2rad(lat1)
+    lat2 = np.deg2rad(lat2)
+    dlat = lat2 - lat1
+    dlon = np.deg2rad(dlon)
+
+    a = (
+        np.sin(dlat / 2.0) ** 2
+        + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2.0) ** 2
+    )
+
+    # Fix both floating point overshoot and NaNs
+    a = np.nan_to_num(a, nan=0.0, posinf=1.0, neginf=0.0)
+    a = np.clip(a, 0.0, 1.0)
+
+    return 2.0 * EARTH_RADIUS_KM * np.arcsin(np.sqrt(a))
+
+
+
+def radius_mask(da, center_lat, center_lon, radius_km):
+    lat_name = get_lat_name(da)
+    lon_name = get_lon_name(da)
+
+    lats = da[lat_name].values
+    lons = da[lon_name].values
+
+    lon2d, lat2d = np.meshgrid(lons, lats)
+
+    dist = great_circle_distance(center_lat, center_lon, lat2d, lon2d)
+
+    return xr.DataArray(
+        dist <= radius_km,
+        coords={lat_name: da[lat_name], lon_name: da[lon_name]},
+        dims=(lat_name, lon_name),
+    )
+
+
+def find_min_mslp_center(mslp, mask=None):
+    x = mslp.where(mask) if mask is not None else mslp
+
+    idx = np.unravel_index(np.nanargmin(x.values), x.shape)
+
+    lat_name = get_lat_name(mslp)
+    lon_name = get_lon_name(mslp)
+
+    return {
+        "lat": float(mslp[lat_name].values[idx[0]]),
+        "lon": float(mslp[lon_name].values[idx[1]]),
+        "mslp": float(mslp.values[idx]),
+    }
+
+
+def tc_metrics_at_center(ds_step, center_lat, center_lon, radius_km=300.0):
+    mslp = get_mslp(ds_step)
+    wind10 = compute_10m_wind(ds_step)
+
+    mask = radius_mask(mslp, center_lat, center_lon, radius_km)
+
+    rec = {
+        "center_lat": center_lat,
+        "center_lon": center_lon,
+        "min_mslp_hpa": float(mslp.where(mask).min(skipna=True).values),
+        "max_10m_wind": float(wind10.where(mask).max(skipna=True).values),
+    }
+
+    if TP_VAR in ds_step:
+        tp = ds_step[TP_VAR]
+        rec["mean_precip"] = area_weighted_mean(tp, mask)
+        rec["max_precip"] = max_value(tp, mask)
+
+    return rec
+
+def find_tc_center_with_cost(
+    mslp,
+    prev_lat,
+    prev_lon,
+    search_radius_km=600.0,
+    distance_weight_hpa=2.0,
+):
+    """
+    Find TC center by minimizing:
+        score = MSLP + distance_weight_hpa * (distance / search_radius_km)
+
+    distance_weight_hpa controls how much you penalize jumping away
+    from the previous center.
+
+    Example:
+        distance_weight_hpa = 2.0 means a point at the edge of the
+        search radius pays a +2 hPa penalty.
+    """
+    search_mask = radius_mask(
+        mslp,
+        prev_lat,
+        prev_lon,
+        search_radius_km,
+    )
+
+    lat_name = get_lat_name(mslp)
+    lon_name = get_lon_name(mslp)
+
+    lats = mslp[lat_name].values
+    lons = mslp[lon_name].values
+    lon2d, lat2d = np.meshgrid(lons, lats)
+
+    dist_km = great_circle_distance(
+        prev_lat,
+        prev_lon,
+        lat2d,
+        lon2d,
+    )
+
+    dist_da = xr.DataArray(
+        dist_km,
+        coords={lat_name: mslp[lat_name], lon_name: mslp[lon_name]},
+        dims=(lat_name, lon_name),
+    )
+
+    score = mslp + distance_weight_hpa * (dist_da / search_radius_km)
+    score = score.where(search_mask)
+
+    idx = np.unravel_index(
+        np.nanargmin(score.values),
+        score.shape,
+    )
+
+    return {
+        "lat": float(mslp[lat_name].values[idx[0]]),
+        "lon": float(mslp[lon_name].values[idx[1]]),
+        "mslp": float(mslp.values[idx]),
+        "distance_from_prev_km": float(dist_da.values[idx]),
+        "score": float(score.values[idx]),
+    }
+
+def get_initial_tc_center_from_mask(ds_step, valid_time):
+    mslp = get_mslp(ds_step)
+
+    tc_mask, mask_path, mask_time, mask_diff_h = load_mask_on_grid(
+        valid_time,
+        mslp,
+    )
+
+    center = find_min_mslp_center(mslp, mask=tc_mask)
+
+    return center, tc_mask, mask_path, mask_time, mask_diff_h
+
+
+
+
+
+
+
+
+###
 
 def compute_ivt(ds):
     """
@@ -816,181 +987,191 @@ def evaluate_ar(time_selection):
         )
 
 
-def evaluate_tc(time_selection):
-    file_table = discover_files(INPUT_DIR)
-
-    if time_selection == "first":
-        time_index = 0
-    elif time_selection == "last":
-        time_index = -1
-    else:
-        raise ValueError(time_selection)
-
-    out_dir = os.path.join(OUT_DIR, f"lead_{time_selection}")
-    os.makedirs(out_dir, exist_ok=True)
-
+def extract_tracked_tc_for_gamma(ds, gamma, initial_center):
     records = []
 
-    for center_time in sorted(file_table["center_time"].unique()):
-        center_time = pd.Timestamp(center_time)
+    prev_lat = initial_center["lat"]
+    prev_lon = initial_center["lon"]
 
-        group = file_table[file_table["center_time"] == center_time]
-        available_gammas = sorted(group["gamma"].unique())
+    for t_idx in range(ds.sizes["time"]):
+        ds_step = ds.isel(time=t_idx)
+        mslp = get_mslp(ds_step)
 
-        control_file = group[group["gamma"] == CONTROL_GAMMA]["file"].iloc[0]
-        control_full = load_prediction(control_file, time_selection=None)
+        if t_idx == 0:
+            center_lat = prev_lat
+            center_lon = prev_lon
+        else:
+            #search_mask = radius_mask(
+            #    mslp,
+            #    prev_lat,
+            #    prev_lon,
+            #    TRACK_SEARCH_RADIUS_KM,
+            #)
 
-        matched_time_index = (
-            0 if time_selection == "first"
-            else control_full.sizes["time"] - 1
+            #center = find_min_mslp_center(mslp, mask=search_mask)
+            
+            center = find_tc_center_with_cost(
+                mslp,
+                prev_lat=prev_lat,
+                prev_lon=prev_lon,
+                search_radius_km=TRACK_SEARCH_RADIUS_KM,
+                distance_weight_hpa=2.0,
+            )
+
+            
+            center_lat = center["lat"]
+            center_lon = center["lon"]
+
+        metrics = tc_metrics_at_center(
+            ds_step,
+            center_lat,
+            center_lon,
+            radius_km=TC_RADIUS_KM,
         )
 
-        valid_time = get_valid_time(control_full, matched_time_index)
+        lead_h = pd.to_timedelta(ds.time.values[t_idx]).total_seconds() / 3600.0
 
-        lead_hours = int((valid_time - center_time) / pd.Timedelta(hours=1))
-        lead_label = f"T+{format_lead_time(lead_hours)}"
-        control_ds = control_full.isel(time=time_index)
-        control_wind10 = compute_10m_wind(control_ds)
-        control_mslp = get_mslp(control_ds)
+        metrics.update({
+            "gamma": gamma,
+            "lead_hours": lead_h,
+            "lead_label": format_lead_time(lead_h),
+            "forecast_valid_time": str(get_valid_time(ds, t_idx)),
+        })
 
-        control_max_wind = max_value(control_wind10)
-        control_min_mslp = float(control_mslp.min(skipna=True).values)
+        records.append(metrics)
 
-        for gamma in available_gammas:
-            forecast_file = group[group["gamma"] == gamma]["file"].iloc[0]
+        prev_lat = center_lat
+        prev_lon = center_lon
 
-            ds_full = load_prediction(forecast_file, time_selection=None)
-            ds = ds_full.isel(time=time_index)
-
-            wind10 = compute_10m_wind(ds)
-            mslp = get_mslp(ds)
-
-            max_wind = max_value(wind10)
-            min_mslp = float(mslp.min(skipna=True).values)
-
-            records.append({
-                "time_selection": time_selection,
-                "center_time": str(center_time),
-                "gamma": gamma,
-                "matched_time_index": matched_time_index,
-                "forecast_valid_time": str(valid_time),
-                "file": forecast_file,
-                "max_10m_wind": max_wind,
-                "min_mslp_hpa": min_mslp,
-                "delta_max_10m_wind": max_wind - control_max_wind,
-                "delta_min_mslp_hpa": min_mslp - control_min_mslp,
-            })
-
-            if gamma != CONTROL_GAMMA:
-                delta_wind10 = wind10 - control_wind10
-
-                safe_time = str(center_time).replace(":", "").replace(" ", "T")
-                out_name = (
-                    f"delta_wind10_{time_selection}_"
-                    f"gamma_{gamma:+.2f}_{safe_time}.png"
-                )
-
-                plot_delta_wind10_map(
-                    delta_wind10,
-                    gamma,
-                    center_time,
-                    out_name,
-                    out_dir,
-                    lead_label=lead_label,
-                )
-
-    summary = pd.DataFrame(records).sort_values(["center_time", "gamma"])
-
-    summary_path = os.path.join(
-        out_dir,
-        f"gamma_summary_metrics_{time_selection}.csv",
-    )
-    summary.to_csv(summary_path, index=False)
-    print("Saved:", summary_path)
-    print(summary)
-
-    plot_dose_response(
-        summary,
-        metric="delta_max_10m_wind",
-        ylabel=f"Δ maximum 10 m wind [m/s] ({time_selection} lead)",
-        out_name=f"dose_response_delta_max_10m_wind_{time_selection}.png",
-        out_dir=out_dir,
-    )
-
-    plot_dose_response(
-        summary,
-        metric="delta_min_mslp_hpa",
-        ylabel=f"Δ minimum MSLP [hPa] ({time_selection} lead)",
-        out_name=f"dose_response_delta_min_mslp_{time_selection}.png",
-        out_dir=out_dir,
-    )
+    return pd.DataFrame(records)
 
 
-def plot_tc_intensity_trajectories():
-    out_dir = os.path.join(OUT_DIR, "tc_intensity_trajectories")
+def evaluate_tc_tracks():
+    out_dir = os.path.join(OUT_DIR, "tc_tracks")
     os.makedirs(out_dir, exist_ok=True)
 
     file_table = discover_files(INPUT_DIR)
-    records = []
 
-    plt.figure(figsize=(8, 5))
+    control_file = file_table[file_table["gamma"] == CONTROL_GAMMA]["file"].iloc[0]
+    control_ds = load_prediction(control_file, time_selection=None)
+
+    valid_time_0 = get_valid_time(control_ds, 0)
+    control_step0 = control_ds.isel(time=0)
+
+    initial_center, tc_mask, mask_path, mask_time, mask_diff_h = (
+        get_initial_tc_center_from_mask(control_step0, valid_time_0)
+    )
+
+    print("Initial TC center:", initial_center)
+    print("Mask:", mask_path)
+
+    all_tracks = []
 
     for _, row in file_table.sort_values("gamma").iterrows():
-        gamma = row["gamma"]
         ds = load_prediction(row["file"], time_selection=None)
 
-        wind10 = compute_10m_wind(ds)
-        mslp = get_mslp(ds)
+        track = extract_tracked_tc_for_gamma(
+            ds,
+            gamma=row["gamma"],
+            initial_center=initial_center,
+        )
 
-        lead_hours = []
-        max_winds = []
-        min_mslps = []
+        track["file"] = row["file"]
+        all_tracks.append(track)
 
-        for t_idx in range(ds.sizes["time"]):
-            lead_h = pd.to_timedelta(ds.time.values[t_idx]).total_seconds() / 3600.0
+    tracks = pd.concat(all_tracks, ignore_index=True)
 
-            wind_t = wind10.isel(time=t_idx)
-            mslp_t = mslp.isel(time=t_idx)
+    control = tracks[tracks["gamma"] == CONTROL_GAMMA][
+        ["lead_hours", "center_lat", "center_lon", "min_mslp_hpa", "max_10m_wind"]
+    ].rename(columns={
+        "center_lat": "control_center_lat",
+        "center_lon": "control_center_lon",
+        "min_mslp_hpa": "control_min_mslp_hpa",
+        "max_10m_wind": "control_max_10m_wind",
+    })
 
-            max_wind = float(wind_t.max(skipna=True).values)
-            min_mslp = float(mslp_t.min(skipna=True).values)
+    tracks = tracks.merge(control, on="lead_hours", how="left")
 
-            lead_hours.append(lead_h)
-            max_winds.append(max_wind)
-            min_mslps.append(min_mslp)
+    tracks["track_error_km"] = great_circle_distance(
+        tracks["center_lat"],
+        tracks["center_lon"],
+        tracks["control_center_lat"],
+        tracks["control_center_lon"],
+    )
 
-            records.append({
-                "gamma": gamma,
-                "lead_hours": lead_h,
-                "lead_label": format_lead_time(lead_h),
-                "forecast_valid_time": str(get_valid_time(ds, t_idx)),
-                "max_10m_wind": max_wind,
-                "min_mslp_hpa": min_mslp,
-                "file": row["file"],
-            })
+    tracks["delta_min_mslp_hpa"] = (
+        tracks["min_mslp_hpa"] - tracks["control_min_mslp_hpa"]
+    )
 
-        plt.plot(lead_hours, max_winds, marker="o", linewidth=2, label=f"γ={gamma:g}")
+    tracks["delta_max_10m_wind"] = (
+        tracks["max_10m_wind"] - tracks["control_max_10m_wind"]
+    )
 
-    plt.xlabel("Forecast lead time [hours]")
-    plt.ylabel("Maximum 10 m wind [m/s]")
-    plt.title(f"TC max 10 m wind trajectory ({CENTER_STR})")
+    tracks_path = os.path.join(out_dir, "tracked_tc_metrics_by_gamma.csv")
+    tracks.to_csv(tracks_path, index=False)
+    print("Saved:", tracks_path)
+
+    plot_tc_tracks(tracks, out_dir)
+    plot_tc_intensity_from_tracks(tracks, out_dir)
+    plot_tc_track_error(tracks, out_dir)
+
+    return tracks
+
+
+def plot_tc_tracks(tracks, out_dir):
+    plt.figure(figsize=(7, 6))
+
+    for gamma, group in tracks.groupby("gamma"):
+        group = group.sort_values("lead_hours")
+        plt.plot(
+            group["center_lon"],
+            group["center_lat"],
+            marker="o",
+            linewidth=2,
+            label=f"γ={gamma:g}",
+        )
+
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.title(f"Tracked TC path ({CENTER_STR})")
     plt.grid(True, alpha=0.3)
     plt.legend(fontsize=8)
     plt.tight_layout()
 
-    wind_path = os.path.join(out_dir, "max_10m_wind_by_gamma.png")
-    plt.savefig(wind_path, dpi=300, bbox_inches="tight")
+    path = os.path.join(out_dir, "tc_tracks_by_gamma.png")
+    plt.savefig(path, dpi=300, bbox_inches="tight")
     plt.close()
-    print("Saved:", wind_path)
+    print("Saved:", path)
 
-    df = pd.DataFrame(records)
-    csv_path = os.path.join(out_dir, "tc_intensity_trajectory_metrics.csv")
-    df.to_csv(csv_path, index=False)
-    print("Saved:", csv_path)
+
+def plot_tc_intensity_from_tracks(tracks, out_dir):
+    plt.figure(figsize=(8, 5))
+
+    for gamma, group in tracks.groupby("gamma"):
+        group = group.sort_values("lead_hours")
+        plt.plot(
+            group["lead_hours"],
+            group["max_10m_wind"],
+            marker="o",
+            linewidth=2,
+            label=f"γ={gamma:g}",
+        )
+
+    plt.xlabel("Forecast lead time [h]")
+    plt.ylabel("Max 10 m wind within TC radius [m/s]")
+    plt.title(f"Tracked TC wind intensity ({CENTER_STR})")
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=8)
+    plt.tight_layout()
+
+    path = os.path.join(out_dir, "tracked_tc_max_wind_by_gamma.png")
+    plt.savefig(path, dpi=300, bbox_inches="tight")
+    plt.close()
+    print("Saved:", path)
 
     plt.figure(figsize=(8, 5))
 
-    for gamma, group in df.groupby("gamma"):
+    for gamma, group in tracks.groupby("gamma"):
         group = group.sort_values("lead_hours")
         plt.plot(
             group["lead_hours"],
@@ -1000,17 +1181,47 @@ def plot_tc_intensity_trajectories():
             label=f"γ={gamma:g}",
         )
 
-    plt.xlabel("Forecast lead time [hours]")
-    plt.ylabel("Minimum MSLP [hPa]")
-    plt.title(f"TC minimum MSLP trajectory ({CENTER_STR})")
+    plt.xlabel("Forecast lead time [h]")
+    plt.ylabel("Min MSLP within TC radius [hPa]")
+    plt.title(f"Tracked TC pressure intensity ({CENTER_STR})")
     plt.grid(True, alpha=0.3)
     plt.legend(fontsize=8)
     plt.tight_layout()
 
-    mslp_path = os.path.join(out_dir, "min_mslp_by_gamma.png")
-    plt.savefig(mslp_path, dpi=300, bbox_inches="tight")
+    path = os.path.join(out_dir, "tracked_tc_min_mslp_by_gamma.png")
+    plt.savefig(path, dpi=300, bbox_inches="tight")
     plt.close()
-    print("Saved:", mslp_path)
+    print("Saved:", path)
+
+
+def plot_tc_track_error(tracks, out_dir):
+    plt.figure(figsize=(8, 5))
+
+    for gamma, group in tracks.groupby("gamma"):
+        if gamma == CONTROL_GAMMA:
+            continue
+
+        group = group.sort_values("lead_hours")
+
+        plt.plot(
+            group["lead_hours"],
+            group["track_error_km"],
+            marker="o",
+            linewidth=2,
+            label=f"γ={gamma:g}",
+        )
+
+    plt.xlabel("Forecast lead time [h]")
+    plt.ylabel("Track displacement from control [km]")
+    plt.title(f"Tracked TC displacement from γ=0 ({CENTER_STR})")
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=8)
+    plt.tight_layout()
+
+    path = os.path.join(out_dir, "track_error_vs_control_by_gamma.png")
+    plt.savefig(path, dpi=300, bbox_inches="tight")
+    plt.close()
+    print("Saved:", path)
 
 def select_video_gammas(group):
     if VIDEO_GAMMA_SELECTION != "extremes_and_control":
@@ -1224,14 +1435,11 @@ def plot_global_ivt_trajectories():
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    for time_selection in TIME_SELECTIONS:
-        if WEATHER_FEATURE == "AR":
-            evaluate_ar(time_selection)
-        elif WEATHER_FEATURE == "TC":
-            evaluate_tc(time_selection)
-
-
     if WEATHER_FEATURE == "AR":
+
+        for time_selection in TIME_SELECTIONS:
+            evaluate_ar(time_selection)
+
         print("\n[MAKING GAMMA TRAJECTORY PLOT]\n")
         plot_global_ivt_trajectories()
 
@@ -1243,9 +1451,9 @@ def main():
             make_all_ivt_videos()
 
 
-    if WEATHER_FEATURE == "TC":
+    elif WEATHER_FEATURE == "TC":
         print("\n[MAKING TC INTENSITY TRAJECTORY PLOTS]\n")
-        plot_tc_intensity_trajectories()
+        evaluate_tc_tracks()
 
     print("[DONE]")
 
