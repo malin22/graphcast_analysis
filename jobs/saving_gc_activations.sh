@@ -6,6 +6,8 @@
 #SBATCH --mem=100G
 #SBATCH --error=logs/error.o%j
 #SBATCH --output=logs/output.o%j
+#SBATCH --output=logs/saving_weather_data%j.out
+#SBATCH --error=logs/saving_weather_data%j.err
 
 set -euo pipefail
 
@@ -15,8 +17,11 @@ echo "Start time: $(date)"
 cd "$SLURM_SUBMIT_DIR"
 echo "Working directory: $(pwd)"
 
-source /home/student/m/mbraatz/miniconda/etc/profile.d/conda.sh
-conda activate graphcast
+# source /home/student/m/mbraatz/miniconda/etc/profile.d/conda.sh
+# conda activate graphcast
+
+source /home/student/s/sascholle/miniconda3/etc/profile.d/conda.sh
+conda activate graphcast312
 
 # Run your script
 srun python -u src/graphcast_setup.py

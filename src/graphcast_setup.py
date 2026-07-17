@@ -41,15 +41,15 @@ gcs_bucket = gcs_client.get_bucket("dm_graphcast")
 dir_prefix = "graphcast/"
 
 data_dir = '/share/prj-4d/graphcast_shared/data/era5_daily_nc'        # contains era5_YYYY-MM-DD.nc
-acts_dir = '/share/prj-4d/graphcast_shared/data/graphcast_activation_2020'
+acts_dir = '/share/prj-4d/graphcast_shared/data/graphcast_activation_2020_Feb'
 os.makedirs(acts_dir, exist_ok=True)
 
 
 # done: 01, 
 ### extracting time 00, 06, 12, 18
 centers = np.arange(
-    np.datetime64("2020-01-01T00"), # produces nodes for time 06, 12, 18, 00
-    np.datetime64("2020-01-01T06"), # exclusive
+    np.datetime64("2020-02-01T00"), # produces nodes for time 06, 12, 18, 00
+    np.datetime64("2020-03-01T06"), # exclusive
     np.timedelta64(6, "h"),
 )
 
@@ -58,10 +58,22 @@ centers = np.arange(
 # ERA5 WINDOWING — *EXACTLY YOUR CODE*
 # ============================================================
 
+# def _open_and_trim(path: str) -> xr.Dataset:
+#     ds = xr.open_dataset(path)
+#     if "time" in ds.dims and ds.sizes["time"] > 4:
+#         ds = ds.isel(time=slice(0, 4))
+#     return ds
+
 def _open_and_trim(path: str) -> xr.Dataset:
-    ds = xr.open_dataset(path)
+    try:
+        ds = xr.open_dataset(path)
+    except Exception as e:
+        print(f"Skipping {path}: {e}")
+        return None
+
     if "time" in ds.dims and ds.sizes["time"] > 4:
         ds = ds.isel(time=slice(0, 4))
+
     return ds
 
 
@@ -84,7 +96,15 @@ def three_step_window(data_dir: str, center_time: str) -> xr.Dataset | None:
     if any(not os.path.exists(p) for p in file_paths):
         return None
 
-    daily = [_open_and_trim(p) for p in file_paths]
+    #daily = [_open_and_trim(p) for p in file_paths]
+
+    daily = []
+    for p in file_paths:
+        ds = _open_and_trim(p)
+        if ds is None:
+            print(f"Skipping center time {center_time} because {p} could not be opened")
+            return None
+        daily.append(ds)
 
     var_time   = [v for v, da in daily[0].data_vars.items() if "time" in da.dims]
     var_static = [v for v, da in daily[0].data_vars.items() if "time" not in da.dims]

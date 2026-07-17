@@ -64,12 +64,20 @@ def plot_yearly_mean_pcs(
     pca_mean_path,
     out_dir="plots",
     n_top_pcs=5,
+    use_last_pcs=False,
     scramble_activations=False,
 ):
     os.makedirs(out_dir, exist_ok=True)
 
     pca_components = np.load(pca_components_path)
     pca_mean = np.load(pca_mean_path)
+
+    if use_last_pcs:
+        pcs = pca_components[-n_top_pcs:]
+        pc_labels = range(pca_components.shape[0] - n_top_pcs + 1, pca_components.shape[0] + 1)
+    else:
+        pcs = pca_components[:n_top_pcs]
+        pc_labels = range(1, n_top_pcs + 1)
 
     #npy_files = sorted(glob(os.path.join(acts_dir, "*.npy")))
     pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t*.npy"
@@ -106,7 +114,7 @@ def plot_yearly_mean_pcs(
                 f"Node mismatch in {os.path.basename(f)}: {X.shape[0]} vs mesh {len(lat)}"
             )
 
-        scores = (X - pca_mean) @ pca_components[:n_top_pcs].T
+        scores = (X - pca_mean) @ pcs.T
 
         if score_sum is None:
             score_sum = np.zeros_like(scores, dtype=np.float64)
@@ -120,13 +128,13 @@ def plot_yearly_mean_pcs(
     mean_scores = score_sum / valid_count
     np.save(os.path.join(out_dir, "mean_pc_scores_year.npy"), mean_scores)
 
-    for pc_idx in range(n_top_pcs):
+    for pc_idx, pc_num in enumerate(pc_labels):
         plot_pc_map(
             mean_scores[:, pc_idx],
             lat,
             lon,
-            os.path.join(out_dir, f"pc{pc_idx + 1}_mean_activation_map_year.png"),
-            title=f"Year-mean PC{pc_idx + 1} activation map",
+            os.path.join(out_dir, f"pc{pc_num}_mean_activation_map_year.png"),
+            title=f"Year-mean PC{pc_num} activation map",
         )
 
     print(f"Saved yearly mean PC maps from {valid_count} files to {out_dir}")
@@ -145,7 +153,7 @@ def plot_cumulative_explained_variance(ipca, out_dir, max_components=None):
     plt.ylim(0, 1.01)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, "pca_cumulative_explained_variance_2021_Jan_layer8.png"), dpi=300, bbox_inches="tight")
+    plt.savefig(os.path.join(out_dir, "pca_cumulative_explained_variance_2021_layer8.png"), dpi=300, bbox_inches="tight")
     plt.close()
 
 def run_pca(
@@ -200,7 +208,7 @@ def run_pca(
 
     print("\nTimestamps with incomplete layer coverage:")
     for timestamp, count in sorted(time_counts.items()):
-        if count != 16:
+        if count not in (1, 16):
             print(timestamp, count)
 
     print("\nAll timestamps found:")
@@ -253,8 +261,8 @@ def run_pca(
     print(f"PCA mean vector shape: {ipca.mean_.shape}")
 
     # Save PCA basis for later reuse
-    np.save(os.path.join(out_dir, "pca_components_2021_Jan_layer8.npy"), ipca.components_)
-    np.save(os.path.join(out_dir, "pca_mean_2021_Jan_layer8.npy"), ipca.mean_)
+    np.save(os.path.join(out_dir, "pca_components_2021_layer8.npy"), ipca.components_)
+    np.save(os.path.join(out_dir, "pca_mean_2021_layer8.npy"), ipca.mean_)
     print(f"Saved PCA basis to {out_dir}/")
 
     # Plot cumulative explained variance
@@ -270,24 +278,25 @@ def run_pca(
     return ipca
 
 if __name__ == "__main__":
-    ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2020"
-    PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components"
+    ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2021"
+    PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only"
     #PLOTS_OUT    = "plots/2021_projected_on_2021"
 
-    # ipca = run_pca(
-    #     acts_dir=ACTS_DIR,
-    #     n_components=400,
-    #     batch_size=10,
-    #     out_dir=PCA_DIR,
+    ipca = run_pca(
+        acts_dir=ACTS_DIR,
+        n_components=512,
+        batch_size=10,
+        out_dir=PCA_DIR,
   
-    # )
+    )
     
 
-    plot_yearly_mean_pcs(
-        acts_dir=ACTS_DIR,
-        pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2020_layer8.npy',
-        pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2020_layer8.npy',
-        out_dir="plots/2020_pca_projected_on_2020",
-        n_top_pcs=20,
-        scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
-    )
+    # plot_yearly_mean_pcs(
+    #     acts_dir=ACTS_DIR,
+    #     pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2020_layer8.npy',
+    #     pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2020_layer8.npy',
+    #     out_dir="plots/2020_pca_projected_on_2020",
+    #     n_top_pcs=10,
+    #     use_last_pcs=True,
+    #     scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
+    # )
