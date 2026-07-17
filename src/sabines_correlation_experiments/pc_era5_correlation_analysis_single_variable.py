@@ -8,6 +8,54 @@ from pathlib import Path
 import numpy as np
 from graphcast import icosahedral_mesh
 
+'''
+Compute a colocated spatial Pearson correlation over mesh nodes.
+
+PC scores at node i are compared with ERA5 values at node i: 
+PC1_node_00001  with  temp_node_00001
+PC1_node_00002  with  temp_node_00002
+PC1_node_00003  with  temp_node_00003
+
+Example output: 
+Loading coarse ERA5 catalog...
+ Loaded 228 time-series coarse files and 2 static coarse files
+ Loaded 1460 coarse timesteps
+Mesh nodes: 40962
+Coarse grid shape: 72 x 144
+Found 1459 activation files
+
+The ERA5 values used:
+DEFAULT_VARS = [
+    "geopotential",
+    "specific_humidity",
+    "temperature",
+    "u_component_of_wind",
+    "v_component_of_wind",
+    "vertical_velocity",
+    "2m_temperature",
+    "10m_u_component_of_wind",
+    "10m_v_component_of_wind",
+    "mean_sea_level_pressure",
+    "total_precipitation_6hr",
+    "toa_incident_solar_radiation",
+    "geopotential_at_surface",
+    "land_sea_mask",
+]
+
+Important notes!
+
+- We transformed ERA5 onto a mesh structure using the script at: 
+    /home/student/s/sascholle/share/graphcast_analysis/src/sabines_correlation_experiments/helper_scripts/put_era5_on_node_mesh.py
+    Which takes a radius of 0.6 around a node location and takes the average ERA5 value that falls into this location. 
+
+- Per timestep, we z-score the activations AND the ERA5 variable over the nodes. 
+    PC1 at timestep t is z-scored across all nodes.
+    PC2 at timestep t is z-scored across all nodes.
+    temperature at timestep t is z-scored across all nodes.
+    u_wind at timestep t is z-scored across all nodes.
+
+'''
+
 # ============================================================
 # DEFAULT CONFIGURATION
 # ============================================================
@@ -57,6 +105,52 @@ def load_activation_matrix(path: Path) -> np.ndarray:
 
 def parse_center_time(path: Path) -> str:
     return path.stem.split("_t")[-1]
+
+def vertices_to_latlon(vertices: np.ndarray):
+    lat = np.degrees(np.arcsin(vertices[:, 2]))
+    lon = np.degrees(np.arctan2(vertices[:, 1], vertices[:, 0]))
+    return lat.astype(np.float32), lon.astype(np.float32)
+
+
+def cyclic_time_features(center_str: str, lon_deg: np.ndarray):
+    """
+    Build GraphCast-like clock/context fields on mesh nodes.
+
+    local_time_* varies over longitude and UTC time.
+    year_progress_* is constant over nodes for a timestep, so it is not useful
+    for per-timestep spatial correlation, but useful for node-time regression.
+   
+    """
+    t = np.datetime64(center_str, "h")
+
+    # UTC hour of day as fraction [0, 1).
+    day = t.astype("datetime64[D]")
+    hours_since_midnight = (t - day) / np.timedelta64(1, "h")
+    utc_day_fraction = float(hours_since_midnight) / 24.0
+
+    # Local solar time: longitude shifts UTC time by lon / 360 of a day.
+    lon_fraction = lon_deg.astype(np.float32) / 360.0
+    local_day_fraction = (utc_day_fraction + lon_fraction) % 1.0
+
+    local_time_angle = 2.0 * np.pi * local_day_fraction
+    local_time_sin = np.sin(local_time_angle).astype(np.float32)
+    local_time_cos = np.cos(local_time_angle).astype(np.float32)
+
+    # Year progress. This is global/constant over nodes at one timestep.
+    year = int(str(t)[:4])
+    year_start = np.datetime64(f"{year}-01-01T00", "h")
+    year_end = np.datetime64(f"{year + 1}-01-01T00", "h")
+
+    year_fraction = float((t - year_start) / (year_end - year_start))
+    year_angle = 2.0 * np.pi * year_fraction
+
+
+    return {
+        "local_time_sin": local_time_sin,
+        "local_time_cos": local_time_cos,
+        "year_progress_sin": np.full_like(lon_deg, np.sin(year_angle), dtype=np.float32),
+        "year_progress_cos": np.full_like(lon_deg, np.cos(year_angle), dtype=np.float32),
+    }
 
 
 # ============================================================
@@ -214,13 +308,15 @@ def load_mesh_catalog(era5_root: Path):
 
     return time_index, time_series, static_fields, vertices
 
-
 def load_mesh_feature_nodes(
     time_index: dict,
     time_series: dict,
     static_fields: dict,
     center_str: str,
     selected_indices: np.ndarray,
+    vertices: np.ndarray,
+    include_context: bool = True,
+    include_year_progress: bool = False,
 ) -> tuple[list[str], np.ndarray]:
     """
     Load one timestep's ERA5 fields and slice to selected mesh nodes.
@@ -237,16 +333,40 @@ def load_mesh_feature_nodes(
     node_fields = []
 
     for name in sorted(time_series.keys()):
-        arr = time_series[name]          # [time, m6_node]
-        nodes = to_float32(arr[t_idx])   # [m6_node]
+        arr = time_series[name]
+        nodes = to_float32(arr[t_idx])
         node_fields.append(nodes[selected_indices])
         feature_names.append(name)
 
     for name in sorted(static_fields.keys()):
-        arr = static_fields[name]        # [m6_node]
+        arr = static_fields[name]
         nodes = to_float32(arr)
         node_fields.append(nodes[selected_indices])
         feature_names.append(name)
+
+    if include_context:
+        lat, lon = vertices_to_latlon(np.asarray(vertices))
+        lat = lat[selected_indices]
+        lon = lon[selected_indices]
+
+        lat_rad = np.deg2rad(lat)
+        lon_rad = np.deg2rad(lon)
+
+        context_fields = {
+            "latitude": lat.astype(np.float32),
+            "latitude_sin": np.sin(lat_rad).astype(np.float32),
+            "longitude_sin": np.sin(lon_rad).astype(np.float32),
+            "longitude_cos": np.cos(lon_rad).astype(np.float32),
+        }
+
+        context_fields.update(cyclic_time_features(center_str, lon))
+
+        for name, nodes in context_fields.items():
+            if name.startswith("year_progress") and not include_year_progress:
+                continue
+
+            node_fields.append(nodes.astype(np.float32))
+            feature_names.append(name)
 
     if not node_fields:
         return [], np.empty((0, 0), dtype=np.float32)
@@ -368,7 +488,10 @@ def run_single_variable_analysis(
             static_fields=static_fields,
             center_str=center_str,
             selected_indices=selected_indices,
-        )
+            vertices=era5_m6_vertices,
+            include_context=True,
+            include_year_progress=False,
+)
 
         if era5_nodes.size == 0:
             print("  Skipping: no ERA5 fields loaded")
