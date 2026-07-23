@@ -8,6 +8,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+'''
+To run without the slurm script: 
+
+python -u /home/student/s/sascholle/share/graphcast_analysis/src/plotting_script_for_correlation_and_regression.py \
+  --correlation-json plots/sabines_experiments/mapping_experiments/correlation_regression_json_results_depreciated/pc_era5_mesh_m5_screening_cache.json \
+  --out-dir plots/sabines_experiments/mapping_experiments/histograms \
+  --pcs 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 \
+  --per-pc \
+  --per-pc-layout grid \
+  --aggregation mean
+
+'''
+
+
 PRESSURE_LEVELS_HPA = [
     1, 2, 3, 5, 7, 10, 20, 30, 50, 70, 100, 125, 150, 175, 200,
     225, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750,
@@ -71,18 +85,94 @@ CATEGORY_COLORS = {
     "Vertical velocity": "#ea580c",
 }
 
+#combine latlon and time sin cos into a max value for plotting 
+COMBINE_FEATURE_GROUPS = {
+    "position_context": {
+        "members": [
+            "latitude",
+            "latitude_sin",
+            "longitude_sin",
+            "longitude_cos",
+        ],
+        "label": "Position context",
+        "category": "Static/context",
+        "combine": "max",
+    },
+    "local_time_context": {
+        "members": [
+            "local_time_sin",
+            "local_time_cos",
+        ],
+        "label": "Local time context",
+        "category": "Static/context",
+        "combine": "max",
+    },
+    "year_progress_context": {
+        "members": [
+            "year_progress_sin",
+            "year_progress_cos",
+        ],
+        "label": "Year progress context",
+        "category": "Static/context",
+        "combine": "max",
+    },
+}
 
 def lev_to_hpa(lev_idx):
     if lev_idx < 0 or lev_idx >= len(PRESSURE_LEVELS_HPA):
         return None
     return PRESSURE_LEVELS_HPA[lev_idx]
 
+def combine_feature_groups(feature_scores):
+    """
+    Collapse sin/cos/context feature channels into single plotting rows.
+
+    Keeps the original feature_scores untouched for the actual analysis.
+    For plotting, each group score is the max absolute/importance score
+    among its member features by default.
+    """
+    combined = dict(feature_scores)
+
+    for group_name, spec in COMBINE_FEATURE_GROUPS.items():
+        members = spec["members"]
+        values = [
+            float(feature_scores[m])
+            for m in members
+            if m in feature_scores and np.isfinite(feature_scores[m])
+        ]
+
+        if not values:
+            continue
+
+        if spec.get("combine", "max") == "mean":
+            combined[group_name] = float(np.mean(values))
+        elif spec.get("combine", "max") == "sum":
+            combined[group_name] = float(np.sum(values))
+        else:
+            combined[group_name] = float(np.max(values))
+
+        for member in members:
+            combined.pop(member, None)
+
+    return combined
 
 def parse_feature_name(name):
     """
     Returns dict with:
       keep, category, label, sort_key
     """
+    if name in COMBINE_FEATURE_GROUPS:
+        spec = COMBINE_FEATURE_GROUPS[name]
+        return {
+            "keep": True,
+            "category": spec["category"],
+            "label": spec["label"],
+            "sort_key": (
+                CATEGORY_ORDER.index(spec["category"]),
+                list(COMBINE_FEATURE_GROUPS).index(name),
+            ),
+        }
+    
     for base, base_label in ATMOSPHERIC_BASES.items():
         prefix = f"{base}_lev"
         if name.startswith(prefix):
@@ -166,39 +256,67 @@ def extract_correlation_scores(data, score_key="mean_abs_r"):
 
 def find_regression_coefficients(pc_data):
     """
-    Handles common coefficient key names.
+    Return regression coefficients as either:
+      - dict[feature_name] = coefficient
+      - array of coefficients plus feature_names elsewhere
     """
-    candidate_keys = [
+
+    # Best case: your JSON stores a complete feature -> coefficient mapping.
+    dict_keys = [
+        "coef_standardized",
+        "standardized_coefficients_by_feature",
+        "coefficients_by_feature",
+    ]
+
+    for key in dict_keys:
+        if key in pc_data and isinstance(pc_data[key], dict):
+            return {
+                feature: float(coef)
+                for feature, coef in pc_data[key].items()
+            }, key
+
+    # Array-style outputs.
+    array_keys = [
         "standardized_coefficients",
-        "coefficient",
+        "coefficients",
         "coef",
         "coefs",
         "model_coefficients",
     ]
 
-    for key in candidate_keys:
+    for key in array_keys:
         if key in pc_data:
             return np.asarray(pc_data[key], dtype=np.float64), key
 
-    # Some scripts save rows instead of arrays.
-    for key in ["top_coefficients", "top_features", "selected_features"]:
+    # Row-style outputs.
+    row_keys = [
+        "ranked_features_standardized",
+        "ranked_coefficients",
+        "top_coefficients",
+        "top_features",
+        "selected_features",
+    ]
+
+    for key in row_keys:
         if key in pc_data and isinstance(pc_data[key], list):
-            rows = pc_data[key]
             feature_scores = {}
-            for row in rows:
+
+            for row in pc_data[key]:
                 if not isinstance(row, dict):
                     continue
+
                 feature = row.get("feature", row.get("variable"))
                 coef = row.get("coefficient", row.get("abs_coefficient"))
+
                 if feature is not None and coef is not None:
-                    feature_scores[feature] = abs(float(coef))
+                    feature_scores[feature] = float(coef)
+
             if feature_scores:
                 return feature_scores, key
 
     raise KeyError(
-        "Could not find regression coefficients. Expected one of: "
-        "standardized_coefficients, coefficients, coef, coefs, model_coefficients, "
-        "or top_coefficients/top_features rows."
+        "Could not find regression coefficients. Expected coef_standardized, "
+        "standardized_coefficients/coefficients arrays, or ranked feature rows."
     )
 
 
@@ -211,14 +329,28 @@ def extract_regression_scores(data, use_abs=True, normalize=True):
 
     for pc_name, pc_data in data.items():
         feature_names = pc_data.get("feature_names")
-
         coef_obj, coef_key = find_regression_coefficients(pc_data)
 
         if isinstance(coef_obj, dict):
-            feature_scores = dict(coef_obj)
+            features = list(coef_obj.keys())
+            coef = np.asarray([coef_obj[f] for f in features], dtype=np.float64)
+
+            if use_abs:
+                coef = np.abs(coef)
+
+            if normalize:
+                denom = np.nanmax(np.abs(coef))
+                if denom > 0:
+                    coef = coef / denom
+
+            feature_scores = {
+                feature: float(value)
+                for feature, value in zip(features, coef)
+            }
+
         else:
             if feature_names is None:
-                raise KeyError(f"{pc_name}: regression JSON has coefficients but no feature_names")
+                raise KeyError(f"{pc_name}: coefficients array but no feature_names")
 
             if len(feature_names) != len(coef_obj):
                 raise ValueError(
@@ -227,6 +359,7 @@ def extract_regression_scores(data, use_abs=True, normalize=True):
                 )
 
             coef = np.asarray(coef_obj, dtype=np.float64)
+
             if use_abs:
                 coef = np.abs(coef)
 
@@ -274,6 +407,7 @@ def aggregate_scores(scores_by_pc, pcs=None, aggregation="mean"):
 
 
 def build_plot_rows(feature_scores):
+    feature_scores = combine_feature_groups(feature_scores)
     rows = []
 
     for feature, score in feature_scores.items():
@@ -476,7 +610,7 @@ def plot_per_pc_grid(
     # Shared x limit.
     all_scores = []
     for pc in pcs:
-        pc_scores = scores_by_pc.get(pc, {})
+        pc_scores = combine_feature_groups(scores_by_pc.get(pc, {}))
         all_scores.extend([abs(float(pc_scores.get(f, 0.0))) for f in features])
 
     x_max = np.nanmax(all_scores) if all_scores else 1.0
@@ -491,12 +625,12 @@ def plot_per_pc_grid(
             continue
 
         pc = pcs[ax_idx]
-        pc_scores = scores_by_pc.get(pc, {})
+        pc_scores = combine_feature_groups(scores_by_pc.get(pc, {}))
         values = np.asarray([float(pc_scores.get(f, 0.0)) for f in features])
 
         ax.barh(y, values, color=colors, alpha=0.85)
         annotate_top_k_bars(ax, values, y, k=3, x_max=x_max)
-        ax.set_title(pc, fontsize=11)
+        ax.set_title(pc, fontsize=12)
         ax.set_xlim(0, x_max * 1.08)
         ax.grid(axis="x", alpha=0.25)
         ax.invert_yaxis()
@@ -507,21 +641,49 @@ def plot_per_pc_grid(
         else:
             ax.tick_params(axis="y", labelleft=False)
 
-        # Light category bands.
+        # Light category bands plus category labels.
         for cat in CATEGORY_ORDER:
             idxs = [i for i, c in enumerate(categories) if c == cat]
             if not idxs:
                 continue
+
             start = min(idxs)
             end = max(idxs)
+            mid = (start + end) / 2
             color = CATEGORY_COLORS.get(cat, "#9ca3af")
-            ax.axhspan(start - 0.5, end + 0.5, color=color, alpha=0.045, linewidth=0)
+
+            ax.axhspan(
+                start - 0.5,
+                end + 0.5,
+                color=color,
+                alpha=0.045,
+                linewidth=0,
+            )
             ax.axhline(start - 0.5, color="black", linewidth=0.4, alpha=0.25)
 
-    fig.suptitle(title, fontsize=16, y=0.995)
-    fig.supxlabel(score_label, fontsize=12)
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+            # Add the group label on the left of each category band.
+            # x is in axes coordinates, y is in data coordinates.
+            if ax_idx % ncols == 0:
+                ax.text(
+                -0.71,
+                mid,
+                cat,
+                transform=ax.get_yaxis_transform(),
+                va="center",
+                ha="center",
+                fontsize=13,
+                fontweight="bold",
+                color=color,
+                #rotation=90,
+                clip_on=False,
+            )
+
+    fig.suptitle(title, fontsize=30, y=0.985)
+    fig.supxlabel(score_label, fontsize=20, y=0.015)
+
+    plt.tight_layout(rect=[0.12, 0.02, 1.0, 0.985]) #rect=[left, bottom, right, top]
+    #plt.subplots_adjust(hspace=0.1, wspace=0.18)
+    plt.savefig(output_path, dpi=450, bbox_inches="tight")
     plt.close()
     print(f"Saved {output_path}")
 
@@ -708,3 +870,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

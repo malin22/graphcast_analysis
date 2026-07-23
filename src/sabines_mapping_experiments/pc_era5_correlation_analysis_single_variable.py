@@ -40,6 +40,13 @@ DEFAULT_VARS = [
     "toa_incident_solar_radiation",
     "geopotential_at_surface",
     "land_sea_mask",
+
+    #new:
+    latitude
+    longitude_sin
+    longitude_cos
+    local_time_sin
+    local_time_cos
 ]
 
 Important notes!
@@ -59,13 +66,13 @@ Important notes!
 # ============================================================
 # DEFAULT CONFIGURATION
 # ============================================================
-DEFAULT_ACTIVATIONS_DIR = Path("/share/prj-4d/graphcast_shared/data/graphcast_activation_2021")
-DEFAULT_ERA5_ROOT = Path("/share/prj-4d/graphcast_shared/data/era5_daily_mesh/2021/mesh_l6")
+DEFAULT_ACTIVATIONS_DIR = Path("/share/prj-4d/graphcast_shared/data/graphcast_activation_2021") #get activations from 2021
+DEFAULT_ERA5_ROOT = Path("/share/prj-4d/graphcast_shared/data/era5_daily_mesh/2021/mesh_l6") #get era5 from 2021
 
-PCA_COMPONENTS_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021.npy"
-PCA_MEAN_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021.npy"
+PCA_COMPONENTS_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2020_layer8.npy" #to do: run pca from train or val set for correlation? open question 
+PCA_MEAN_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2020_layer8.npy" # to do: train or val pca?
 
-RESULTS_DIR = Path("plots/sabines_experiments")
+RESULTS_DIR = Path("plots/sabines_experiments/mapping_experiments/test_with_latlontime")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 N_PCS_TO_CHECK = 20
@@ -458,7 +465,9 @@ def run_single_variable_analysis(
     print(f"Loaded {len(static_fields)} static ERA5 fields")
     print(f"Loaded {len(time_index)} ERA5 timesteps")
 
-    activation_files = sorted(activations_dir.glob("*.npy"))
+    pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t*.npy"
+    activation_files = sorted(activations_dir.glob(pattern))
+    #activation_files = sorted(activations_dir.glob("*.npy"))
     if max_timesteps is not None:
         activation_files = activation_files[:max_timesteps]
 

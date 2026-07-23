@@ -8,21 +8,53 @@ from pathlib import Path
 
 import numpy as np
 from graphcast import icosahedral_mesh
-from sklearn.linear_model import ElasticNet, Lasso, Ridge
+from sklearn.linear_model import ElasticNet, Lasso, Ridge, LinearRegression
 from sklearn.preprocessing import StandardScaler
 
-DEFAULT_ACTIVATIONS_DIR = Path("/share/prj-4d/graphcast_shared/data/graphcast_activation_2021")
-DEFAULT_ERA5_ROOT = Path("/share/prj-4d/graphcast_shared/data/era5_daily_mesh/2021/mesh_l6")
+'''
+Compute a colocated spatial Pearson REGRESSION over mesh nodes.
 
-PCA_COMPONENTS_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021.npy"
-PCA_MEAN_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021.npy"
+The ERA5 values used:
+DEFAULT_VARS = [
+    "geopotential",
+    "specific_humidity",
+    "temperature",
+    "u_component_of_wind",
+    "v_component_of_wind",
+    "vertical_velocity",
+    "2m_temperature",
+    "10m_u_component_of_wind",
+    "10m_v_component_of_wind",
+    "mean_sea_level_pressure",
+    "total_precipitation_6hr",
+    "toa_incident_solar_radiation",
+    "geopotential_at_surface",
+    "land_sea_mask",
 
-RESULTS_DIR = Path("plots/sabines_experiments")
+    #new:
+    latitude
+    longitude_sin
+    longitude_cos
+    local_time_sin
+    local_time_cos
+
+'''
+
+DEFAULT_ACTIVATIONS_DIR = Path("/share/prj-4d/graphcast_shared/data/graphcast_activation_2021") #val set 2021
+DEFAULT_ERA5_ROOT = Path("/share/prj-4d/graphcast_shared/data/era5_daily_mesh/2021/mesh_l6") #val set 2021
+
+PCA_COMPONENTS_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2020_layer8.npy" #train set coordinates 2019/2020
+PCA_MEAN_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2020_layer8.npy"  #train set coordinates 2019/2020
+
+RESULTS_DIR = Path("plots/sabines_experiments/mapping_experiments/test_withlatlontime")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 MIN_POINTS = 10
 
 
+# ============================================================
+# NUMERIC HELPERS
+# ============================================================
 def to_float32(x) -> np.ndarray:
     arr = np.asarray(x)
     if arr.dtype == np.dtype("|V2"):
@@ -46,7 +78,54 @@ def load_activation_matrix(path: Path) -> np.ndarray:
 def parse_center_time(path: Path) -> str:
     return path.stem.split("_t")[-1]
 
+def vertices_to_latlon(vertices: np.ndarray):
+    lat = np.degrees(np.arcsin(vertices[:, 2]))
+    lon = np.degrees(np.arctan2(vertices[:, 1], vertices[:, 0]))
+    return lat.astype(np.float32), lon.astype(np.float32)
 
+
+def cyclic_time_features(center_str: str, lon_deg: np.ndarray):
+    """
+    Build GraphCast-like clock/context fields on mesh nodes.
+
+    local_time_* varies over longitude and UTC time.
+    year_progress_* is constant over nodes for a timestep, so it is not useful
+    for per-timestep spatial correlation, but useful for node-time regression.
+    """
+    t = np.datetime64(center_str, "h")
+
+    # UTC hour of day as fraction [0, 1).
+    day = t.astype("datetime64[D]")
+    hours_since_midnight = (t - day) / np.timedelta64(1, "h")
+    utc_day_fraction = float(hours_since_midnight) / 24.0
+
+    # Local solar time: longitude shifts UTC time by lon / 360 of a day.
+    lon_fraction = lon_deg.astype(np.float32) / 360.0
+    local_day_fraction = (utc_day_fraction + lon_fraction) % 1.0
+
+    local_time_angle = 2.0 * np.pi * local_day_fraction
+    local_time_sin = np.sin(local_time_angle).astype(np.float32)
+    local_time_cos = np.cos(local_time_angle).astype(np.float32)
+
+    # Year progress. This is global/constant over nodes at one timestep.
+    year = int(str(t)[:4])
+    year_start = np.datetime64(f"{year}-01-01T00", "h")
+    year_end = np.datetime64(f"{year + 1}-01-01T00", "h")
+
+    year_fraction = float((t - year_start) / (year_end - year_start))
+    year_angle = 2.0 * np.pi * year_fraction
+
+    return {
+        "local_time_sin": local_time_sin,
+        "local_time_cos": local_time_cos,
+        "year_progress_sin": np.full_like(lon_deg, np.sin(year_angle), dtype=np.float32),
+        "year_progress_cos": np.full_like(lon_deg, np.cos(year_angle), dtype=np.float32),
+    }
+
+
+# ============================================================
+# MESH LEVEL SELECTION
+# ============================================================
 def get_graphcast_mesh_vertices(level: int, splits: int = 6) -> np.ndarray:
     meshes = icosahedral_mesh.get_hierarchy_of_triangular_meshes_for_sphere(splits=splits)
     return np.asarray(meshes[level].vertices, dtype=np.float32)
@@ -97,7 +176,9 @@ def select_activation_nodes(activations: np.ndarray, selected_m6_indices: np.nda
         f"selected nodes {n_selected} or full m6 nodes {n_m6_nodes}"
     )
 
-
+# ============================================================
+# ERA5 MESH LOADING
+# ============================================================
 def load_mesh_catalog(era5_root: Path):
     time_values = np.load(era5_root / "time_values.npy", allow_pickle=False)
     time_index = {
@@ -120,29 +201,74 @@ def load_mesh_catalog(era5_root: Path):
 
     return time_index, time_series, static_fields, vertices
 
+def load_era5_X_for_timestep(
+    time_index: dict,
+    time_series: dict,
+    static_fields: dict,
+    center_str: str,
+    selected_indices: np.ndarray,
+    vertices: np.ndarray,
+    include_context: bool = True,
+    include_year_progress: bool = False,
+) -> tuple[list[str], np.ndarray]:
+    """
+    Load one timestep's ERA5 fields and slice to selected mesh nodes.
 
-def load_era5_X_for_timestep(time_index, time_series, static_fields, center_str, selected_indices):
+    Returns:
+      feature_names: list[str]
+      era5_nodes: [n_features, n_selected_nodes]
+    """
     if center_str not in time_index:
-        return None, None
+        return [], np.empty((0, 0), dtype=np.float32)
 
     t_idx = time_index[center_str]
     feature_names = []
-    cols = []
+    node_fields = []
 
     for name in sorted(time_series.keys()):
-        vals = to_float32(time_series[name][t_idx])[selected_indices]
-        cols.append(vals)
+        arr = time_series[name]
+        nodes = to_float32(arr[t_idx])
+        node_fields.append(nodes[selected_indices])
         feature_names.append(name)
 
     for name in sorted(static_fields.keys()):
-        vals = to_float32(static_fields[name])[selected_indices]
-        cols.append(vals)
+        arr = static_fields[name]
+        nodes = to_float32(arr)
+        node_fields.append(nodes[selected_indices])
         feature_names.append(name)
 
-    X = np.stack(cols, axis=1).astype(np.float32)  # [nodes, features]
-    return feature_names, X
+    if include_context:
+        lat, lon = vertices_to_latlon(np.asarray(vertices))
+        lat = lat[selected_indices]
+        lon = lon[selected_indices]
 
+        lat_rad = np.deg2rad(lat)
+        lon_rad = np.deg2rad(lon)
 
+        context_fields = {
+            "latitude": lat.astype(np.float32),
+            "latitude_sin": np.sin(lat_rad).astype(np.float32),
+            "longitude_sin": np.sin(lon_rad).astype(np.float32),
+            "longitude_cos": np.cos(lon_rad).astype(np.float32),
+        }
+
+        context_fields.update(cyclic_time_features(center_str, lon))
+
+        for name, nodes in context_fields.items():
+            if name.startswith("year_progress") and not include_year_progress:
+                continue
+
+            node_fields.append(nodes.astype(np.float32))
+            feature_names.append(name)
+
+    if not node_fields:
+        return [], np.empty((0, 0), dtype=np.float32)
+
+    return feature_names, np.stack(node_fields, axis=0)
+
+# ============================================================
+# PCA PROJECTION
+# ============================================================
 def project_pc(activations, pca_mean, pca_components, pc_idx: int):
     if activations.shape[1] != pca_mean.shape[0]:
         raise ValueError(
@@ -165,8 +291,19 @@ def finite_and_optional_sample(X, y, max_nodes=None, rng=None):
     return X[idx], y[idx]
 
 
+# ============================================================
+# REGRESSION
+# ============================================================
 def fit_with_alpha_grid(X_train_z, y_train_z, X_val_z, y_val_z, model_type, alpha_grid, l1_ratio):
     model_type = model_type.lower()
+
+    if model_type in ("linear", "linearregression", "ols"):
+        print("  fitting LinearRegression", flush=True)
+        model = LinearRegression(fit_intercept=True)
+        model.fit(X_train_z, y_train_z)
+        score = float(model.score(X_val_z, y_val_z))
+        return model, score, None
+
     best_model = None
     best_score = -np.inf
     best_alpha = None
@@ -176,6 +313,7 @@ def fit_with_alpha_grid(X_train_z, y_train_z, X_val_z, y_val_z, model_type, alph
             f"  fitting alpha {alpha_i}/{len(alpha_grid)}: {alpha}",
             flush=True,
         )
+
         if model_type == "ridge":
             model = Ridge(alpha=float(alpha), fit_intercept=True)
         elif model_type == "lasso":
@@ -188,11 +326,11 @@ def fit_with_alpha_grid(X_train_z, y_train_z, X_val_z, y_val_z, model_type, alph
                 max_iter=5000,
                 tol=1e-3,
                 random_state=0,
-                selection='random',
+                selection="random",
                 precompute=True,
             )
         else:
-            raise ValueError("model_type must be Ridge, Lasso, or ElasticNet")
+            raise ValueError("model_type must be Linear, Ridge, Lasso, or ElasticNet")
 
         model.fit(X_train_z, y_train_z)
         score = model.score(X_val_z, y_val_z)
@@ -203,7 +341,6 @@ def fit_with_alpha_grid(X_train_z, y_train_z, X_val_z, y_val_z, model_type, alph
             best_alpha = float(alpha)
 
     return best_model, best_score, best_alpha
-
 
 def rank_coefficients(feature_names, coefs):
     rows = [
@@ -251,7 +388,9 @@ def atomic_write_json(path: Path, payload: dict):
         json.dump(payload, f, indent=2)
     tmp.replace(path)
 
-
+# ============================================================
+# ANALYSIS
+# ============================================================
 def run_regression(args):
     rng = np.random.default_rng(args.random_seed)
 
@@ -264,7 +403,10 @@ def run_regression(args):
     selected_indices = selected_m6_indices_for_mesh_level(args.mesh_level, era5_m6_vertices)
     n_selected_nodes = len(selected_indices)
 
-    activation_files = sorted(args.activations_dir.glob("*.npy"))
+    pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t*.npy"
+    activation_files = sorted(args.activations_dir.glob(pattern))
+    #activation_files = sorted(args.activations_dir.glob("*.npy"))
+    
     usable = [(p, parse_center_time(p)) for p in activation_files if parse_center_time(p) in time_index]
 
     if args.max_timesteps is not None:
@@ -282,12 +424,14 @@ def run_regression(args):
     else:
         pc_indices = list(range(min(args.n_pcs, pca_components.shape[0])))
 
-    if args.alpha_grid:
-        alpha_grid = np.array(args.alpha_grid, dtype=np.float64)
-    elif args.model_type.lower() == "ridge":
-        alpha_grid = np.logspace(-3, 4, 20)
-    else:
-        alpha_grid = np.logspace(-3, 1, 16)
+        if args.model_type.lower() in ("linear", "linearregression", "ols"):
+            alpha_grid = None
+        elif args.alpha_grid:
+            alpha_grid = np.array(args.alpha_grid, dtype=np.float64)
+        elif args.model_type.lower() == "ridge":
+            alpha_grid = np.logspace(-3, 4, 20)
+        else:
+            alpha_grid = np.logspace(-3, 1, 16)
 
     results = {}
 
@@ -315,18 +459,25 @@ def run_regression(args):
                 activations = load_activation_matrix(act_file)
                 activations = select_activation_nodes(activations, selected_indices, n_m6_nodes)
 
-                feature_names, X = load_era5_X_for_timestep(
-                    time_index,
-                    time_series,
-                    static_fields,
-                    center_str,
-                    selected_indices,
+                feature_names, era5_nodes = load_era5_X_for_timestep(
+                    time_index=time_index,
+                    time_series=time_series,
+                    static_fields=static_fields,
+                    center_str=center_str,
+                    selected_indices=selected_indices,
+                    vertices=era5_m6_vertices,
+                    include_context=True,
+                    include_year_progress=True, # for correlation keep false, for regression true!
                 )
 
                 if feature_names_ref is None:
                     feature_names_ref = feature_names
                 elif feature_names != feature_names_ref:
                     raise ValueError("ERA5 feature ordering changed between timesteps")
+                
+                if era5_nodes.size == 0:
+                    continue
+                X = era5_nodes.T  # [nodes, features]
 
                 y = project_pc(activations, pca_mean, pca_components, pc_idx)
 
@@ -387,7 +538,7 @@ def run_regression(args):
             "mesh_level": int(args.mesh_level),
             "n_selected_nodes": int(n_selected_nodes),
             "model_type": args.model_type,
-            "alpha": float(alpha),
+            "alpha": None if alpha is None else float(alpha),
             "l1_ratio": float(args.l1_ratio) if args.model_type.lower() == "elasticnet" else None,
             "val_r2": float(val_r2),
             "n_features": int(len(feature_names_ref)),
@@ -420,13 +571,15 @@ def run_regression(args):
     atomic_write_json(args.output_path, results)
     print(f"\nSaved all-variable regression results to {args.output_path}")
 
-
+# ============================================================
+# MAIN
+# ============================================================
 def main():
     parser = argparse.ArgumentParser(description="All-variable ERA5 mesh-node regression for GraphCast PCs")
     parser.add_argument("--activations-dir", type=Path, default=DEFAULT_ACTIVATIONS_DIR)
     parser.add_argument("--era5-root", type=Path, default=DEFAULT_ERA5_ROOT)
     parser.add_argument("--mesh-level", type=int, choices=[0, 1, 2, 3, 4, 5, 6], default=6)
-    parser.add_argument("--model-type", choices=["Ridge", "Lasso", "ElasticNet"], default="Ridge")
+    parser.add_argument("--model-type", choices=["Linear", "Ridge", "Lasso", "ElasticNet"], default="Ridge")
     parser.add_argument("--l1-ratio", type=float, default=0.5)
     parser.add_argument("--n-pcs", type=int, default=20)
     parser.add_argument("--pc-indices", type=int, nargs="*", default=None)
