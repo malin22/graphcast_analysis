@@ -2,10 +2,11 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
+BASE_PATH = "plots/malins_experiments/2020_2021_regression/PCA/ridge/l5_nodes"
 
-CSV_PATH = "plots/malins_experiments/2021_regression/PCA/ridge/l5_nodes/pc_regression_physical_variables.csv"
+CSV_PATH = os.path.join(BASE_PATH, "pc_regression_physical_variables_2020train_2021test.csv")
 
-OUT_DIR = "plots/malins_experiments/2021_regression/PCA/ridge/l5_nodes/figures"
+OUT_DIR = os.path.join(BASE_PATH, "figures")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 

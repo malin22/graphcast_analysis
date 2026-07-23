@@ -3,7 +3,7 @@
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=100G
+#SBATCH --mem=200G
 #SBATCH --error=logs/error.o%j
 #SBATCH --output=logs/output.o%j
 

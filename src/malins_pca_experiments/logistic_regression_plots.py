@@ -8,11 +8,14 @@ import matplotlib.pyplot as plt
 # =====================
 
 WEATHER_FEATURE = "TC"  # "AR" or "TC"
+HIERARCHY_LEVEL = 6  # Node hierarchy level (1-6) for PCA scores
 
-PCA_CSV = f"plots/malins_experiments/2021_logistic_probe/{WEATHER_FEATURE}/PCA/logistic_probe_intersection_M5_max_3hour.csv"
-RAW_CSV = f"plots/malins_experiments/2021_logistic_probe/{WEATHER_FEATURE}/raw_activations/logistic_probe_intersection_M5_max_3hour.csv"
+BASE_PATH = f"plots/malins_experiments/logistic_regression/{WEATHER_FEATURE}/Node_Hierarchy_Level_M{HIERARCHY_LEVEL}"
 
-OUT_DIR = f"plots/malins_experiments/2021_logistic_probe/{WEATHER_FEATURE}/figures"
+PCA_CSV = os.path.join(BASE_PATH, "PCA", f"logistic_probe_2020train_2021test_intersection_M{HIERARCHY_LEVEL}_max_3hour.csv")
+RAW_CSV = os.path.join(BASE_PATH, "raw_activations", f"logistic_probe_2020train_2021test_intersection_M{HIERARCHY_LEVEL}_max_3hour.csv")
+
+OUT_DIR = os.path.join(BASE_PATH, "figures")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 
@@ -23,8 +26,9 @@ os.makedirs(OUT_DIR, exist_ok=True)
 pca = pd.read_csv(PCA_CSV)
 raw = pd.read_csv(RAW_CSV)
 
-raw_ap = raw["average_precision"].iloc[0]
-raw_auc = raw["roc_auc"].iloc[0]
+raw_ap = raw["test_average_precision"].iloc[0]
+raw_auc = raw["test_roc_auc"].iloc[0]
+raw_f1 = raw["test_f1"].iloc[0]
 raw_n_features = raw["n_features"].iloc[0]
 
 
@@ -74,18 +78,31 @@ def plot_metric(metric, ylabel, title, raw_value, out_name):
 # MAKE PLOTS
 # =====================
 
+positive_fraction = raw["test_positive_rate"].iloc[0]
+positive_percent = 100 * positive_fraction
+positives_per_10000 = positive_fraction * 10000
+
 plot_metric(
-    metric="average_precision",
+    metric="test_average_precision",
     ylabel="Average Precision (AP)",
-    title=f"{WEATHER_FEATURE} decodability from GraphCast latent PCs",
+    title=f"{WEATHER_FEATURE} Average Precision PCs vs Raw Activations",
     raw_value=raw_ap,
     out_name=f"{WEATHER_FEATURE.lower()}_average_precision_vs_pcs.png",
 )
 
 plot_metric(
-    metric="roc_auc",
+    metric="test_roc_auc",
     ylabel="ROC-AUC",
-    title=f"{WEATHER_FEATURE} ROC-AUC from GraphCast latent PCs",
+    title=f"{WEATHER_FEATURE} ROC-AUC PCs vs Raw Activations",
     raw_value=raw_auc,
     out_name=f"{WEATHER_FEATURE.lower()}_auc_vs_pcs.png",
+)
+
+plot_metric(
+    metric="test_f1",
+    ylabel="F1 Score",
+    title=f"{WEATHER_FEATURE} F1 Score PCs vs Raw Activations \n"
+    f"Test set positive fraction: {positive_percent:.3f}%",
+    raw_value=raw_f1,
+    out_name=f"{WEATHER_FEATURE.lower()}_f1_vs_pcs.png",
 )

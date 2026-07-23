@@ -20,13 +20,29 @@ from graphcast import icosahedral_mesh
 YEARS = [2020, 2021]
 
 PC_SCORES_PATHS = [
-    f"/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_{y}_per_timestep.npy"
-    for y in YEARS
+    (
+        "/share/prj-4d/graphcast_shared/data/"
+        "pc_scores_per_timestep/"
+        "pc_scores_2020_per_timestep.npy"
+    ),
+    (
+        "/share/prj-4d/graphcast_shared/data/"
+        "pc_scores_per_timestep/"
+        "pc_scores_2021_from_2020_pca_per_timestep.npy"
+    ),
 ]
 
 TIMESTEP_FILES_TXTS = [
-    f"/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_{y}_per_timestep_files.txt"
-    for y in YEARS
+    (
+        "/share/prj-4d/graphcast_shared/data/"
+        "pc_scores_per_timestep/"
+        "pc_scores_2020_per_timestep_files.txt"
+    ),
+    (
+        "/share/prj-4d/graphcast_shared/data/"
+        "pc_scores_per_timestep/"
+        "pc_scores_2021_from_2020_pca_per_timestep_files.txt"
+    ),
 ]
 
 ACTS_DIRS = [
@@ -243,8 +259,16 @@ def corr(a, b):
         return np.nan
     return np.corrcoef(a[mask], b[mask])[0, 1]
 
-
 def load_pca_features(all_nodes, samples_per_t):
+    if regression_type == "ridge":
+        max_needed = max(PC_COUNTS)
+        feature_counts = PC_COUNTS
+    elif regression_type == "lasso":
+        max_needed = MAX_PCA
+        feature_counts = [MAX_PCA]
+    else:
+        raise ValueError(f"Unknown regression_type: {regression_type}")
+
     all_timestamps = []
     all_pc_scores = []
 
@@ -254,35 +278,22 @@ def load_pca_features(all_nodes, samples_per_t):
         _, ts = load_timestamps(txt_path)
         pcs = np.load(pc_path, mmap_mode="r")
 
+        max_features = min(max_needed, pcs.shape[2])
+
         all_timestamps.append(ts)
         all_pc_scores.append(
-            np.asarray(pcs[:, all_nodes, :], dtype=np.float32)
+            np.asarray(pcs[:, all_nodes, :max_features], dtype=np.float32)
         )
 
     timestamps = pd.DatetimeIndex(np.concatenate(all_timestamps))
     pc_scores = np.concatenate(all_pc_scores, axis=0)
 
     T, n_nodes, K = pc_scores.shape
+    feature_counts = [n for n in feature_counts if n <= K]
 
-    if n_nodes != samples_per_t:
-        raise ValueError(f"Expected {samples_per_t} nodes, got {n_nodes}")
-
-    if regression_type == "ridge":
-        max_features = min(max(PC_COUNTS), K)
-        feature_counts = [n for n in PC_COUNTS if n <= max_features]
-
-    elif regression_type == "lasso":
-        max_features = min(MAX_PCA, K)
-        feature_counts = [max_features]
-
-    else:
-        raise ValueError(f"Unknown regression_type: {regression_type}")
-
-    X = pc_scores[:, :, :max_features]
-    X = X.reshape(T * samples_per_t, max_features)
+    X = pc_scores.reshape(T * samples_per_t, K)
 
     return X, timestamps, feature_counts
-
 
 def load_raw_activation_features(all_nodes, samples_per_t):
     act_files = []
@@ -378,17 +389,18 @@ def main():
         f"to predict {len(TARGETS)} targets"
     )
 
+    valid_X = np.all(np.isfinite(X), axis=1)
+
+
     y_by_target = {}
 
     for target in TARGETS:
-        print(f"Loading meshed ERA5 target: {target['name']}")
+        print(f"Loading target: {target['name']}")
         y_by_target[target["name"]] = load_mesh_target(
             target,
             timestamps=timestamps,
             node_indices=all_nodes,
         )
-
-    valid_X = np.all(np.isfinite(X), axis=1)
 
     results = []
 
@@ -400,6 +412,7 @@ def main():
 
         valid_train = valid & train_mask
         valid_test = valid & test_mask
+
 
         for n_features in feature_counts:
             X_train = X[valid_train, :n_features]

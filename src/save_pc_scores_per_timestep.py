@@ -123,11 +123,12 @@ def project_activations_to_pcs_incremental(
 
 
 if __name__ == "__main__":
-    ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2021"
-    PCA_COMPONENTS_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2021.npy"
-    PCA_MEAN_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2021.npy"
+    YEAR = 2020
+    ACTS_DIR = f"/share/prj-4d/graphcast_shared/data/graphcast_activation_{YEAR}"
+    PCA_COMPONENTS_PATH = f"/share/prj-4d/graphcast_shared/data/pca_components/pca_components_{YEAR}.npy"
+    PCA_MEAN_PATH = f"/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_{YEAR}.npy"
 
-    OUT_PATH = "/share/prj-4d/graphcast_shared/data/pc_scores_2021_per_timestep.npy"
+    OUT_PATH = f"/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_{YEAR}_per_timestep.npy"
 
     project_activations_to_pcs_incremental(
         acts_dir=ACTS_DIR,
