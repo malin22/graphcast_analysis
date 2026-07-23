@@ -10,22 +10,26 @@ import xarray as xr
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
 
+import matplotlib.pyplot as plt
+from matplotlib.colors import TwoSlopeNorm
+from scipy.ndimage import label
+
 
 # =====================
 # CONFIG
 # =====================
 
-WEATHER_FEATURE = "TC"
+WEATHER_FEATURE = "AR"
 THRESHOLD = 0.8
-CENTER_STR = "2021-04-08T18"
+CENTER_STR = "2021-02-12T18"
 NODE_HIERARCHY_LEVEL = 6
 
 # Only generate videos for the lowest, highest, and control gamma values.
 VIDEO_GAMMA_SELECTION = [-0.5, 0.5]
 
 
-TC_RADIUS_KM = 300.0          # intensity radius
-TRACK_SEARCH_RADIUS_KM = 600.0  # search radius around previous center
+TC_RADIUS_KM = 200.0          # intensity radius
+TRACK_SEARCH_RADIUS_KM = 300.0  # search radius around previous center
 EARTH_RADIUS_KM = 6371.0
 
 
@@ -72,6 +76,290 @@ TP_VAR = "total_precipitation_6hr"
 G = 9.80665
 
 
+
+# =====================
+# ERA5 TRUTH
+# =====================
+
+ERA5_DAILY_DIR = "/share/prj-4d/graphcast_shared/data/era5_daily_nc"
+
+def open_era5_day(date_str):
+    """
+    Open one daily ERA5 file.
+
+    Expected filename:
+        era5_YYYY-MM-DD.nc
+    """
+    path = os.path.join(
+        ERA5_DAILY_DIR,
+        f"era5_{date_str}.nc",
+    )
+
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"ERA5 file not found: {path}")
+
+    return xr.open_dataset(path)
+    
+
+def standardize_era5_coordinates(ds):
+    """
+    Standardize common ERA5 coordinate names.
+    """
+    rename = {}
+
+    if "latitude" in ds.coords and "lat" not in ds.coords:
+        rename["latitude"] = "lat"
+
+    if "longitude" in ds.coords and "lon" not in ds.coords:
+        rename["longitude"] = "lon"
+
+    if "valid_time" in ds.coords and "time" not in ds.coords:
+        rename["valid_time"] = "time"
+
+    if rename:
+        ds = ds.rename(rename)
+
+    # ERA5 latitude is usually ordered north to south.
+    # Sorting is not strictly required for the metrics, but gives a
+    # conventional ascending coordinate.
+    if "lat" in ds.coords:
+        ds = ds.sortby("lat")
+
+    return ds
+
+
+def load_era5_at_time(valid_time):
+    """
+    Load ERA5 for exactly the requested forecast valid time.
+
+    Returns
+    -------
+    era5_step : xr.Dataset
+        ERA5 dataset at the requested time.
+    era5_path : str
+        Path to the daily ERA5 file.
+    """
+    valid_time = pd.Timestamp(valid_time)
+
+    date_str = valid_time.strftime("%Y-%m-%d")
+    era5_path = os.path.join(
+        ERA5_DAILY_DIR,
+        f"era5_{date_str}.nc",
+    )
+
+    ds = open_era5_day(date_str)
+    ds = standardize_era5_coordinates(ds)
+
+    if "time" not in ds.coords:
+        ds.close()
+        raise ValueError(
+            f"No time coordinate found in ERA5 file: {era5_path}"
+        )
+
+    try:
+        # Select the exact corresponding ERA5 time.
+        era5_step = ds.sel(
+            time=np.datetime64(valid_time.to_datetime64())
+        ).load()
+
+    except KeyError:
+        available_times = pd.to_datetime(ds["time"].values)
+        ds.close()
+
+        raise KeyError(
+            f"ERA5 time {valid_time} was not found in {era5_path}.\n"
+            f"Available times: {list(available_times)}"
+        )
+
+    ds.close()
+
+    return era5_step, era5_path
+
+
+
+def get_first_existing_variable(ds, names):
+    for name in names:
+        if name in ds:
+            return ds[name]
+
+    raise KeyError(
+        f"None of these variables were found: {names}. "
+        f"Available variables: {list(ds.data_vars)}"
+    )
+
+
+def get_era5_mslp(ds):
+    mslp = get_first_existing_variable(
+        ds,
+        [
+            "mean_sea_level_pressure",
+            "msl",
+        ],
+    )
+
+    # Convert Pa to hPa.
+    if float(mslp.max(skipna=True)) > 2000:
+        mslp = mslp / 100.0
+
+    mslp.name = "mslp"
+    return mslp
+
+
+def compute_era5_10m_wind(ds):
+    u10 = get_first_existing_variable(
+        ds,
+        [
+            "10m_u_component_of_wind",
+            "u10",
+        ],
+    )
+
+    v10 = get_first_existing_variable(
+        ds,
+        [
+            "10m_v_component_of_wind",
+            "v10",
+        ],
+    )
+
+    wind10 = np.hypot(u10, v10)
+    wind10.name = "wind10"
+    return wind10
+
+
+def era5_tc_metrics_at_center(
+    era5_step,
+    center_lat,
+    center_lon,
+    radius_km=TC_RADIUS_KM,
+):
+    mslp = get_era5_mslp(era5_step)
+    wind10 = compute_era5_10m_wind(era5_step)
+
+    mask = radius_mask(
+        mslp,
+        center_lat,
+        center_lon,
+        radius_km,
+    )
+
+    return {
+        "center_lat": center_lat,
+        "center_lon": center_lon,
+        "min_mslp_hpa": float(
+            mslp.where(mask).min(skipna=True).values
+        ),
+        "max_10m_wind": float(
+            wind10.where(mask).max(skipna=True).values
+        ),
+    }
+
+
+
+def extract_tracked_tc_from_era5(
+    forecast_ds,
+    initial_center,
+):
+    """
+    Track the TC independently in ERA5 at every GraphCast forecast
+    valid time.
+
+    forecast_ds is used only for its lead times and valid times.
+    """
+    records = []
+
+    prev_lat = initial_center["lat"]
+    prev_lon = initial_center["lon"]
+
+    for t_idx in range(forecast_ds.sizes["time"]):
+        valid_time = get_valid_time(forecast_ds, t_idx)
+
+        era5_step, era5_file = load_era5_at_time(valid_time)
+        era5_mslp = get_era5_mslp(era5_step)
+
+        center = find_tc_center_with_cost(
+            era5_mslp,
+            prev_lat=prev_lat,
+            prev_lon=prev_lon,
+            search_radius_km=TRACK_SEARCH_RADIUS_KM,
+            distance_weight_hpa=2.0,
+        )
+
+        center_lat = center["lat"]
+        center_lon = center["lon"]
+
+        metrics = era5_tc_metrics_at_center(
+            era5_step,
+            center_lat,
+            center_lon,
+            radius_km=TC_RADIUS_KM,
+        )
+
+        lead_h = (
+            pd.to_timedelta(
+                forecast_ds.time.values[t_idx]
+            ).total_seconds()
+            / 3600.0
+        )
+
+        metrics.update({
+            "source": "ERA5",
+            "lead_hours": lead_h,
+            "lead_label": format_lead_time(lead_h),
+            "forecast_valid_time": str(valid_time),
+            "era5_time": str(valid_time),
+            "era5_file": era5_file,
+        })
+
+        records.append(metrics)
+
+        prev_lat = center_lat
+        prev_lon = center_lon
+
+    return pd.DataFrame(records)
+
+
+
+def extract_era5_global_ivt_trajectory(forecast_ds):
+    """
+    Calculate global mean ERA5 IVT at every forecast valid time.
+
+    forecast_ds is used only to obtain the valid times and lead times.
+    """
+    records = []
+
+    for t_idx in range(forecast_ds.sizes["time"]):
+        valid_time = get_valid_time(
+            forecast_ds,
+            t_idx,
+        )
+
+        era5_step, era5_file = load_era5_at_time(
+            valid_time
+        )
+
+        era5_ivt = compute_ivt(era5_step)
+
+        global_mean_ivt = area_weighted_mean(
+            era5_ivt
+        )
+
+        lead_h = (
+            pd.to_timedelta(
+                forecast_ds.time.values[t_idx]
+            ).total_seconds()
+            / 3600.0
+        )
+
+        records.append({
+            "source": "ERA5",
+            "lead_hours": lead_h,
+            "forecast_valid_time": str(valid_time),
+            "global_mean_ivt": global_mean_ivt,
+            "era5_file": era5_file,
+        })
+
+    return pd.DataFrame(records)
 # =====================
 # FILE HANDLING
 # =====================
@@ -154,6 +442,17 @@ def load_prediction(path, time_selection=None):
     return ds
 
 
+
+
+def gamma_colors(gammas):
+    cmap = plt.get_cmap("coolwarm")      # or "RdBu_r", "seismic"
+    norm = TwoSlopeNorm(
+        vmin=min(gammas),
+        vcenter=0.0,
+        vmax=max(gammas),
+    )
+
+    return {g: cmap(norm(g)) for g in gammas}, cmap, norm
 # =====================
 # METEOROLOGICAL METRICS
 # =====================
@@ -318,7 +617,30 @@ def get_initial_tc_center_from_mask(ds_step, valid_time):
 
 
 
+def get_tc_components(tc_mask, min_pixels=5):
+    labeled, n_components = label(tc_mask.values.astype(bool))
 
+    components = []
+
+    for component_id in range(1, n_components + 1):
+        component = labeled == component_id
+
+        if component.sum() < min_pixels:
+            continue
+
+        component_mask = xr.DataArray(
+            component,
+            coords=tc_mask.coords,
+            dims=tc_mask.dims,
+        )
+
+        components.append({
+            "tc_id": component_id,
+            "mask": component_mask,
+            "n_pixels": int(component.sum()),
+        })
+
+    return components
 
 
 ###
@@ -1052,37 +1374,135 @@ def evaluate_tc_tracks():
 
     file_table = discover_files(INPUT_DIR)
 
+    if CONTROL_GAMMA not in file_table["gamma"].values:
+        raise ValueError(f"No control gamma={CONTROL_GAMMA} found.")
+
     control_file = file_table[file_table["gamma"] == CONTROL_GAMMA]["file"].iloc[0]
     control_ds = load_prediction(control_file, time_selection=None)
 
-    valid_time_0 = get_valid_time(control_ds, 0)
-    control_step0 = control_ds.isel(time=0)
+    ##delte me:
+    # Plot the first forecast step of gamma=0
+    wind10 = compute_10m_wind(control_ds.isel(time=0))
 
-    initial_center, tc_mask, mask_path, mask_time, mask_diff_h = (
-        get_initial_tc_center_from_mask(control_step0, valid_time_0)
+    plt.figure(figsize=(10, 5))
+
+    wind10.plot(
+        cmap="viridis",
+        cbar_kwargs={"label": "10 m wind speed (m/s)"}
     )
 
-    print("Initial TC center:", initial_center)
-    print("Mask:", mask_path)
+    plt.title(
+        f"Gamma = 0, first forecast step\n"
+        f"{pd.Timestamp(get_valid_time(control_ds, 0)):%Y-%m-%d %H:%M}"
+    )
+
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+
+    plt.tight_layout()
+    plt.savefig(
+        os.path.join(out_dir, "gamma0_first_step_wind10.png"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.close()
+
+    valid_time_0 = get_valid_time(control_ds, 0)
+    control_step0 = control_ds.isel(time=0)
+    mslp0 = get_mslp(control_step0)
+
+    # Load TC mask at the initial forecast time
+    tc_mask, mask_path, mask_time, mask_diff_h = load_mask_on_grid(
+        valid_time_0,
+        mslp0,
+    )
+
+    # Split initial TC mask into separate connected objects
+    tc_components = get_tc_components(tc_mask, min_pixels=5)
+
+    print(f"Initial mask: {mask_path}")
+    print(f"Mask time: {mask_time}, diff={mask_diff_h:.1f} h")
+    print(f"Found {len(tc_components)} TC components")
 
     all_tracks = []
+    all_era5_tracks = []
 
-    for _, row in file_table.sort_values("gamma").iterrows():
-        ds = load_prediction(row["file"], time_selection=None)
+    for comp in tc_components:
+        tc_id = comp["tc_id"]
+        component_mask = comp["mask"]
 
-        track = extract_tracked_tc_for_gamma(
-            ds,
-            gamma=row["gamma"],
+        initial_center = find_min_mslp_center(
+            mslp0,
+            mask=component_mask,
+        )
+
+        era5_track = extract_tracked_tc_from_era5(
+            forecast_ds=control_ds,
             initial_center=initial_center,
         )
 
-        track["file"] = row["file"]
-        all_tracks.append(track)
+        era5_track["tc_id"] = tc_id
+        era5_track["component_n_pixels"] = comp["n_pixels"]
+        era5_track["initial_center_lat"] = initial_center["lat"]
+        era5_track["initial_center_lon"] = initial_center["lon"]
+        era5_track["mask_file"] = mask_path
+        era5_track["mask_time"] = str(mask_time)
+        era5_track["mask_time_diff_h"] = mask_diff_h
+
+        all_era5_tracks.append(era5_track)
+
+        print(
+            f"TC {tc_id}: pixels={comp['n_pixels']}, "
+            f"initial center=({initial_center['lat']:.2f}, "
+            f"{initial_center['lon']:.2f}), "
+            f"MSLP={initial_center['mslp']:.2f}"
+        )
+
+        for _, row in file_table.sort_values("gamma").iterrows():
+            ds = load_prediction(row["file"], time_selection=None)
+
+            track = extract_tracked_tc_for_gamma(
+                ds,
+                gamma=row["gamma"],
+                initial_center=initial_center,
+            )
+
+            track["tc_id"] = tc_id
+            track["component_n_pixels"] = comp["n_pixels"]
+            track["initial_center_lat"] = initial_center["lat"]
+            track["initial_center_lon"] = initial_center["lon"]
+            track["initial_center_mslp_hpa"] = initial_center["mslp"]
+            track["mask_file"] = mask_path
+            track["mask_time"] = str(mask_time)
+            track["mask_time_diff_h"] = mask_diff_h
+            track["file"] = row["file"]
+
+            all_tracks.append(track)
+
+    if not all_tracks:
+        raise ValueError("No TC components found in the initial mask.")
 
     tracks = pd.concat(all_tracks, ignore_index=True)
 
+    era5_tracks = pd.concat(all_era5_tracks, ignore_index=True)
+
+    era5_tracks_path = os.path.join(
+        out_dir,
+        "tracked_tc_metrics_era5.csv",
+    )
+    era5_tracks.to_csv(era5_tracks_path, index=False)
+    print("Saved:", era5_tracks_path)
+
+    # Compare every gamma to its own TC's control trajectory
     control = tracks[tracks["gamma"] == CONTROL_GAMMA][
-        ["lead_hours", "center_lat", "center_lon", "min_mslp_hpa", "max_10m_wind"]
+        [
+            "tc_id",
+            "lead_hours",
+            "center_lat",
+            "center_lon",
+            "min_mslp_hpa",
+            "max_10m_wind",
+        ]
     ].rename(columns={
         "center_lat": "control_center_lat",
         "center_lon": "control_center_lon",
@@ -1090,7 +1510,11 @@ def evaluate_tc_tracks():
         "max_10m_wind": "control_max_10m_wind",
     })
 
-    tracks = tracks.merge(control, on="lead_hours", how="left")
+    tracks = tracks.merge(
+        control,
+        on=["tc_id", "lead_hours"],
+        how="left",
+    )
 
     tracks["track_error_km"] = great_circle_distance(
         tracks["center_lat"],
@@ -1111,117 +1535,221 @@ def evaluate_tc_tracks():
     tracks.to_csv(tracks_path, index=False)
     print("Saved:", tracks_path)
 
-    plot_tc_tracks(tracks, out_dir)
-    plot_tc_intensity_from_tracks(tracks, out_dir)
-    plot_tc_track_error(tracks, out_dir)
+    # Optional: one summary row per TC and gamma
+    summary = (
+        tracks.groupby(["tc_id", "gamma"])
+        .agg(
+            n_steps=("lead_hours", "count"),
+            max_track_error_km=("track_error_km", "max"),
+            mean_track_error_km=("track_error_km", "mean"),
+            min_mslp_hpa=("min_mslp_hpa", "min"),
+            max_10m_wind=("max_10m_wind", "max"),
+            mean_delta_min_mslp_hpa=("delta_min_mslp_hpa", "mean"),
+            mean_delta_max_10m_wind=("delta_max_10m_wind", "mean"),
+            max_delta_max_10m_wind=("delta_max_10m_wind", "max"),
+            min_delta_min_mslp_hpa=("delta_min_mslp_hpa", "min"),
+        )
+        .reset_index()
+    )
+
+    summary_path = os.path.join(out_dir, "tracked_tc_summary_by_gamma.csv")
+    summary.to_csv(summary_path, index=False)
+    print("Saved:", summary_path)
+
+    # Existing plot functions can still work, but now include all tc_id values.
+    # Better: update them later to either facet by tc_id or save one plot per tc_id.
+    plot_tc_tracks(tracks, out_dir, era5_tracks=era5_tracks,)
+    plot_tc_intensity_from_tracks(tracks, out_dir, era5_tracks=era5_tracks,)
+    #plot_tc_track_error(tracks, out_dir)
 
     return tracks
 
 
-def plot_tc_tracks(tracks, out_dir):
-    plt.figure(figsize=(7, 6))
 
-    for gamma, group in tracks.groupby("gamma"):
-        group = group.sort_values("lead_hours")
-        plt.plot(
-            group["center_lon"],
-            group["center_lat"],
-            marker="o",
-            linewidth=2,
-            label=f"γ={gamma:g}",
+def plot_tc_intensity_from_tracks(
+    tracks,
+    out_dir,
+    era5_tracks=None,
+):
+    gammas = sorted(tracks["gamma"].unique())
+    colors, cmap, norm = gamma_colors(gammas)
+
+    for tc_id, tc_tracks in tracks.groupby("tc_id"):
+
+        if era5_tracks is not None and not era5_tracks.empty:
+            tc_era5 = (
+                era5_tracks[
+                    era5_tracks["tc_id"] == tc_id
+                ]
+                .sort_values("lead_hours")
+            )
+        else:
+            tc_era5 = pd.DataFrame()
+
+        # =====================
+        # WIND PLOT
+        # =====================
+
+        plt.figure(figsize=(8, 5))
+
+        for gamma, group in tc_tracks.groupby("gamma"):
+            group = group.sort_values("lead_hours")
+
+            plt.plot(
+                group["lead_hours"],
+                group["max_10m_wind"],
+                marker="o",
+                linewidth=2,
+                color=colors[gamma],
+                label=f"γ={gamma:g}",
+            )
+
+        # ERA5 on the same axes
+        if not tc_era5.empty:
+            plt.plot(
+                tc_era5["lead_hours"],
+                tc_era5["max_10m_wind"],
+                color="black",
+                linestyle="--",
+                marker="o",
+                markersize=4,
+                linewidth=3,
+                label="ERA5",
+                zorder=10,
+            )
+
+        plt.xlabel("Forecast lead time [h]")
+        plt.ylabel("Max 10 m wind within TC radius [m/s]")
+        plt.title(
+            f"Tracked TC wind intensity, TC {tc_id} "
+            f"({CENTER_STR})"
         )
+        plt.grid(True, alpha=0.3)
+        plt.legend(fontsize=8)
+        plt.tight_layout()
 
-    plt.xlabel("Longitude")
-    plt.ylabel("Latitude")
-    plt.title(f"Tracked TC path ({CENTER_STR})")
-    plt.grid(True, alpha=0.3)
-    plt.legend(fontsize=8)
-    plt.tight_layout()
-
-    path = os.path.join(out_dir, "tc_tracks_by_gamma.png")
-    plt.savefig(path, dpi=300, bbox_inches="tight")
-    plt.close()
-    print("Saved:", path)
-
-
-def plot_tc_intensity_from_tracks(tracks, out_dir):
-    plt.figure(figsize=(8, 5))
-
-    for gamma, group in tracks.groupby("gamma"):
-        group = group.sort_values("lead_hours")
-        plt.plot(
-            group["lead_hours"],
-            group["max_10m_wind"],
-            marker="o",
-            linewidth=2,
-            label=f"γ={gamma:g}",
+        path = os.path.join(
+            out_dir,
+            f"tracked_tc_{tc_id}_max_wind_by_gamma.png",
         )
+        plt.savefig(path, dpi=300, bbox_inches="tight")
+        plt.close()
+        print("Saved:", path)
 
-    plt.xlabel("Forecast lead time [h]")
-    plt.ylabel("Max 10 m wind within TC radius [m/s]")
-    plt.title(f"Tracked TC wind intensity ({CENTER_STR})")
-    plt.grid(True, alpha=0.3)
-    plt.legend(fontsize=8)
-    plt.tight_layout()
+        # =====================
+        # PRESSURE PLOT
+        # =====================
 
-    path = os.path.join(out_dir, "tracked_tc_max_wind_by_gamma.png")
-    plt.savefig(path, dpi=300, bbox_inches="tight")
-    plt.close()
-    print("Saved:", path)
+        plt.figure(figsize=(8, 5))
 
-    plt.figure(figsize=(8, 5))
+        for gamma, group in tc_tracks.groupby("gamma"):
+            group = group.sort_values("lead_hours")
 
-    for gamma, group in tracks.groupby("gamma"):
-        group = group.sort_values("lead_hours")
-        plt.plot(
-            group["lead_hours"],
-            group["min_mslp_hpa"],
-            marker="o",
-            linewidth=2,
-            label=f"γ={gamma:g}",
+            plt.plot(
+                group["lead_hours"],
+                group["min_mslp_hpa"],
+                marker="o",
+                linewidth=2,
+                color=colors[gamma],
+                label=f"γ={gamma:g}",
+            )
+
+        # ERA5 on the same axes
+        if not tc_era5.empty:
+            plt.plot(
+                tc_era5["lead_hours"],
+                tc_era5["min_mslp_hpa"],
+                color="black",
+                linestyle="--",
+                marker="o",
+                markersize=4,
+                linewidth=3,
+                label="ERA5",
+                zorder=10,
+            )
+
+        plt.xlabel("Forecast lead time [h]")
+        plt.ylabel("Min MSLP within TC radius [hPa]")
+        plt.title(
+            f"Tracked TC pressure intensity, TC {tc_id} "
+            f"({CENTER_STR})"
         )
+        plt.grid(True, alpha=0.3)
+        plt.legend(fontsize=8)
+        plt.tight_layout()
 
-    plt.xlabel("Forecast lead time [h]")
-    plt.ylabel("Min MSLP within TC radius [hPa]")
-    plt.title(f"Tracked TC pressure intensity ({CENTER_STR})")
-    plt.grid(True, alpha=0.3)
-    plt.legend(fontsize=8)
-    plt.tight_layout()
-
-    path = os.path.join(out_dir, "tracked_tc_min_mslp_by_gamma.png")
-    plt.savefig(path, dpi=300, bbox_inches="tight")
-    plt.close()
-    print("Saved:", path)
-
-
-def plot_tc_track_error(tracks, out_dir):
-    plt.figure(figsize=(8, 5))
-
-    for gamma, group in tracks.groupby("gamma"):
-        if gamma == CONTROL_GAMMA:
-            continue
-
-        group = group.sort_values("lead_hours")
-
-        plt.plot(
-            group["lead_hours"],
-            group["track_error_km"],
-            marker="o",
-            linewidth=2,
-            label=f"γ={gamma:g}",
+        path = os.path.join(
+            out_dir,
+            f"tracked_tc_{tc_id}_min_mslp_by_gamma.png",
         )
+        plt.savefig(path, dpi=300, bbox_inches="tight")
+        plt.close()
+        print("Saved:", path)
 
-    plt.xlabel("Forecast lead time [h]")
-    plt.ylabel("Track displacement from control [km]")
-    plt.title(f"Tracked TC displacement from γ=0 ({CENTER_STR})")
-    plt.grid(True, alpha=0.3)
-    plt.legend(fontsize=8)
-    plt.tight_layout()
 
-    path = os.path.join(out_dir, "track_error_vs_control_by_gamma.png")
-    plt.savefig(path, dpi=300, bbox_inches="tight")
-    plt.close()
-    print("Saved:", path)
+def plot_tc_tracks(
+    tracks,
+    out_dir,
+    era5_tracks=None,
+):
+    gammas = sorted(tracks["gamma"].unique())
+    colors, cmap, norm = gamma_colors(gammas)
+
+    for tc_id, tc_tracks in tracks.groupby("tc_id"):
+
+        plt.figure(figsize=(7, 6))
+
+        for gamma, group in tc_tracks.groupby("gamma"):
+            group = group.sort_values("lead_hours")
+
+            plt.plot(
+                group["center_lon"],
+                group["center_lat"],
+                marker="o",
+                markersize=4,
+                linewidth=2,
+                color=colors[gamma],
+                label=f"γ={gamma:g}",
+            )
+
+        if era5_tracks is not None and not era5_tracks.empty:
+            tc_era5 = (
+                era5_tracks[
+                    era5_tracks["tc_id"] == tc_id
+                ]
+                .sort_values("lead_hours")
+            )
+
+            # ERA5 on the same axes as all gamma trajectories
+            if not tc_era5.empty:
+                plt.plot(
+                    tc_era5["center_lon"],
+                    tc_era5["center_lat"],
+                    marker="o",
+                    markersize=5,
+                    color="black",
+                    linestyle="--",
+                    linewidth=3,
+                    label="ERA5",
+                    zorder=10,
+                )
+
+        plt.xlabel("Longitude")
+        plt.ylabel("Latitude")
+        plt.title(
+            f"Tracked TC path, TC {tc_id} ({CENTER_STR})"
+        )
+        plt.grid(True, alpha=0.3)
+        plt.legend(fontsize=8)
+        plt.tight_layout()
+
+        path = os.path.join(
+            out_dir,
+            f"tc_{tc_id}_tracks_by_gamma.png",
+        )
+        plt.savefig(path, dpi=300, bbox_inches="tight")
+        plt.close()
+        print("Saved:", path)
 
 def select_video_gammas(group):
     if VIDEO_GAMMA_SELECTION != "extremes_and_control":
@@ -1353,83 +1881,171 @@ def make_all_ivt_videos():
 
 def plot_global_ivt_trajectories():
     """
-    Plot the global mean IVT over the forecast trajectory for every gamma.
+    Plot global mean IVT over the forecast trajectory for every gamma
+    and for ERA5 truth.
 
     Output:
         evaluation/ivt_trajectories/
             global_mean_ivt_by_gamma.png
             global_mean_ivt_by_gamma.csv
+            global_mean_ivt_era5.csv
     """
-    out_dir = os.path.join(OUT_DIR, "ivt_trajectories")
+    out_dir = os.path.join(
+        OUT_DIR,
+        "ivt_trajectories",
+    )
     os.makedirs(out_dir, exist_ok=True)
 
     file_table = discover_files(INPUT_DIR)
 
+    if CONTROL_GAMMA not in file_table["gamma"].values:
+        raise ValueError(
+            f"No control gamma={CONTROL_GAMMA} found."
+        )
+
+    gammas = sorted(file_table["gamma"].unique())
+    colors, cmap, norm = gamma_colors(gammas)
+
     records = []
 
-    plt.figure(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    # =====================
+    # GAMMA TRAJECTORIES
+    # =====================
 
     for _, row in file_table.sort_values("gamma").iterrows():
         gamma = row["gamma"]
 
-        ds = load_prediction(row["file"], time_selection=None)
+        ds = load_prediction(
+            row["file"],
+            time_selection=None,
+        )
+
         ivt = compute_ivt(ds)
 
         if "time" not in ivt.dims:
-            print(f"[SKIP] gamma={gamma}: no time dimension")
+            print(
+                f"[SKIP] gamma={gamma}: no time dimension"
+            )
             continue
 
         values = []
         lead_hours = []
 
         for t_idx in range(ivt.sizes["time"]):
-
             ivt_t = ivt.isel(time=t_idx)
 
             mean_ivt = area_weighted_mean(ivt_t)
 
-            values.append(mean_ivt)
-
-            # GraphCast lead times are stored in nanoseconds
             lead_h = (
-                pd.to_timedelta(ivt.time.values[t_idx]).total_seconds()
+                pd.to_timedelta(
+                    ivt.time.values[t_idx]
+                ).total_seconds()
                 / 3600.0
             )
+
+            values.append(mean_ivt)
             lead_hours.append(lead_h)
 
             records.append({
+                "source": "GraphCast",
                 "gamma": gamma,
                 "lead_hours": lead_h,
+                "forecast_valid_time": str(
+                    get_valid_time(ds, t_idx)
+                ),
                 "global_mean_ivt": mean_ivt,
                 "file": row["file"],
             })
 
-        plt.plot(
+        ax.plot(
             lead_hours,
             values,
             marker="o",
             linewidth=2,
+            color=colors[gamma],
             label=f"γ={gamma:g}",
         )
 
-    plt.xlabel("Forecast lead time [hours]")
-    plt.ylabel("Global mean IVT")
-    plt.title(f"Global mean IVT trajectory ({CENTER_STR})")
-    plt.grid(True, alpha=0.3)
-    plt.legend(title="Gamma", fontsize=8)
+    # =====================
+    # ERA5 TRAJECTORY
+    # =====================
 
-    plt.tight_layout()
+    control_file = file_table.loc[
+        file_table["gamma"] == CONTROL_GAMMA,
+        "file",
+    ].iloc[0]
 
-    fig_path = os.path.join(out_dir, "global_mean_ivt_by_gamma.png")
-    plt.savefig(fig_path, dpi=300, bbox_inches="tight")
-    plt.close()
+    control_ds = load_prediction(
+        control_file,
+        time_selection=None,
+    )
 
-    csv_path = os.path.join(out_dir, "global_mean_ivt_by_gamma.csv")
-    pd.DataFrame(records).to_csv(csv_path, index=False)
+    era5_trajectory = (
+        extract_era5_global_ivt_trajectory(
+            control_ds
+        )
+    )
+
+    ax.plot(
+        era5_trajectory["lead_hours"],
+        era5_trajectory["global_mean_ivt"],
+        color="black",
+        linestyle="--",
+        marker="o",
+        markersize=4,
+        linewidth=3,
+        label="ERA5",
+        zorder=10,
+    )
+
+    # =====================
+    # FORMATTING
+    # =====================
+
+    ax.set_xlabel("Forecast lead time [hours]")
+    ax.set_ylabel("Global mean IVT")
+    ax.set_title(
+        f"Global mean IVT trajectory ({CENTER_STR})"
+    )
+    ax.grid(True, alpha=0.3)
+    ax.legend(title="Trajectory", fontsize=8)
+
+    fig.tight_layout()
+
+    fig_path = os.path.join(
+        out_dir,
+        "global_mean_ivt_by_gamma.png",
+    )
+    fig.savefig(
+        fig_path,
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.close(fig)
+
+    graphcast_csv_path = os.path.join(
+        out_dir,
+        "global_mean_ivt_by_gamma.csv",
+    )
+    pd.DataFrame(records).to_csv(
+        graphcast_csv_path,
+        index=False,
+    )
+
+    era5_csv_path = os.path.join(
+        out_dir,
+        "global_mean_ivt_era5.csv",
+    )
+    era5_trajectory.to_csv(
+        era5_csv_path,
+        index=False,
+    )
 
     print("Saved:", fig_path)
-    print("Saved:", csv_path)
-
+    print("Saved:", graphcast_csv_path)
+    print("Saved:", era5_csv_path)
 
 
 def main():

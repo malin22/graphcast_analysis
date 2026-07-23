@@ -19,6 +19,6 @@ source /home/student/m/mbraatz/miniconda/etc/profile.d/conda.sh
 conda activate graphcast
 
 # Run your script
-srun python -u src/node_analysis.py
+srun python -u src/save_pc_scores_per_timestep.py
 
 echo "Finished at: $(date)"

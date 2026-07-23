@@ -5,7 +5,7 @@ from glob import glob
 import numpy as np
 import pandas as pd
 import xarray as xr
-
+from sklearn.metrics import precision_recall_curve
 import joblib
 
 from sklearn.pipeline import make_pipeline
@@ -27,7 +27,7 @@ from graphcast import icosahedral_mesh
 # =====================
 
 WEATHER_FEATURE = "TC"  # "AR" or "TC"
-REPRESENTATION = "PCA"  # "raw_activations" or "PCA"
+REPRESENTATION = "raw_activations"  # "raw_activations" or "PCA"
 NODE_HIERARCHY_LEVEL = 6
 
 FEATURE_COUNTS_RAW = [512]
@@ -53,18 +53,19 @@ ACTS_DIRS = {
 # PCA inputs, if REPRESENTATION == "PCA".
 PC_SCORES_PATHS = {
     2020: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2020_per_timestep.npy",
-    2021: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2021_per_timestep.npy",
+    2021: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2021_from_2020_pca_per_timestep.npy",
 }
+
 TIMESTEP_FILES_TXTS = {
     2020: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2020_per_timestep_files.txt",
-    2021: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2021_per_timestep_files.txt",
+    2021: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2021_from_2020_pca_per_timestep_files.txt",
 }
 
 MASK_DIR = f"/share/prj-4d/graphcast_shared/data/ClimateNetLarge/{WEATHER_FEATURE}_labels_cleaned"
 
 OUT_DIR = (
     f"plots/malins_experiments/logistic_regression/"
-    f"{WEATHER_FEATURE}/{REPRESENTATION}"
+    f"{WEATHER_FEATURE}/Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}/{REPRESENTATION}/"
 )
 os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -229,6 +230,48 @@ def build_X_for_split(
     return np.concatenate(X_parts, axis=0)
 
 
+def build_raw_X_for_split(
+    matched_df,
+    split_mask_events,
+    all_nodes,
+    n_features,
+):
+    X_parts = []
+
+    selected_rows = matched_df.loc[split_mask_events]
+
+    for i, (_, row) in enumerate(selected_rows.iterrows(), start=1):
+        activation_path = row["activation_file"]
+
+        X_t = load_activations(activation_path)
+
+        if X_t.shape[1] < n_features:
+            raise ValueError(
+                f"{activation_path} has only {X_t.shape[1]} features, "
+                f"but {n_features} were requested."
+            )
+
+        X_t = X_t[all_nodes, :n_features]
+
+        X_parts.append(
+            np.asarray(X_t, dtype=np.float32)
+        )
+
+        if i % 100 == 0:
+            print(
+                f"Loaded {i}/{len(selected_rows)} "
+                f"raw activation timesteps"
+            )
+
+    if not X_parts:
+        return np.empty(
+            (0, n_features),
+            dtype=np.float32,
+        )
+
+    return np.concatenate(X_parts, axis=0)
+
+
 def load_mask_at_nodes(mask_path, lat, lon, node_indices, label_mode="intersection"):
     ds = xr.open_dataset(mask_path)
 
@@ -359,6 +402,41 @@ def evaluate_split(model, X_split, y_split, split_name, threshold=0.5):
     metrics = {f"{split_name}_{k}": v for k, v in metrics.items()}
     return y_prob, metrics
 
+
+def metrics_at_best_f1_threshold(y_true, y_prob):
+    """
+    Select the threshold that maximizes F1 on the supplied data.
+
+    Note: when called on the test set, the resulting F1 is test-set optimized
+    and should be described as 'best test F1', not as an unbiased test metric.
+    """
+    precision, recall, thresholds = precision_recall_curve(y_true, y_prob)
+
+    # precision and recall have one more entry than thresholds.
+    precision_for_thresholds = precision[:-1]
+    recall_for_thresholds = recall[:-1]
+
+    denominator = precision_for_thresholds + recall_for_thresholds
+
+    f1_scores = np.divide(
+        2 * precision_for_thresholds * recall_for_thresholds,
+        denominator,
+        out=np.zeros_like(denominator),
+        where=denominator > 0,
+    )
+
+    best_idx = int(np.argmax(f1_scores))
+    best_threshold = float(thresholds[best_idx])
+
+    y_pred = y_prob >= best_threshold
+
+    return {
+        "best_threshold": best_threshold,
+        "f1": f1_score(y_true, y_pred, zero_division=0),
+        "precision": precision_score(y_true, y_pred, zero_division=0),
+        "recall": recall_score(y_true, y_pred, zero_division=0),
+    }
+
 # =====================
 # MAIN
 # =====================
@@ -376,21 +454,37 @@ def main():
     print("Nodes per timestep:", samples_per_t)
     print(f"Using M{NODE_HIERARCHY_LEVEL} mesh nodes")
 
-    if REPRESENTATION != "PCA":
-        raise NotImplementedError(
-            "This memory-efficient main is currently written for REPRESENTATION='PCA'."
+    pc_scores_by_year = None
+
+    if REPRESENTATION == "PCA":
+        pc_scores_by_year, timestamps_by_year, max_features = load_pca_metadata(
+            PC_SCORES_PATHS,
+            TIMESTEP_FILES_TXTS,
         )
 
-    # ---------------------
-    # Load PCA files as memory maps only
-    # ---------------------
-    pc_scores_by_year, timestamps_by_year, max_features = load_pca_metadata(
-        PC_SCORES_PATHS,
-        TIMESTEP_FILES_TXTS,
-    )
+        graphcast_df = build_graphcast_time_table(timestamps_by_year)
+        feature_counts = PC_COUNTS
 
-    graphcast_df = build_graphcast_time_table(timestamps_by_year)
-    feature_counts = PC_COUNTS
+    elif REPRESENTATION == "raw_activations":
+        act_files, graphcast_times, max_features = load_raw_activation_years(
+            ACTS_DIRS
+        )
+
+        graphcast_df = pd.DataFrame({
+            "year": graphcast_times.year.astype(int),
+            "t_idx": np.arange(len(act_files), dtype=int),
+            "time": graphcast_times,
+            "activation_file": act_files,
+        }).sort_values("time").reset_index(drop=True)
+
+        feature_counts = FEATURE_COUNTS_RAW
+
+    else:
+        raise ValueError(
+            f"Unknown REPRESENTATION: {REPRESENTATION}"
+        )
+
+
 
     mask_files = sorted(glob(os.path.join(MASK_DIR, "*.nc")))
 
@@ -434,16 +528,23 @@ def main():
         y_parts.append(y_nodes)
         event_parts.append(np.full(samples_per_t, event_idx, dtype=np.int32))
 
-        matched_rows.append({
+        matched_row = {
             "mask_file": os.path.basename(mask_path),
             "mask_time": mask_time,
             "graphcast_time": graphcast_time,
             "year": year,
             "t_idx": t_idx,
-            "time_difference_hours": abs(graphcast_time - mask_time).total_seconds() / 3600,
+            "time_difference_hours": abs(
+                graphcast_time - mask_time
+            ).total_seconds() / 3600,
             "positive_nodes": int(np.sum(y_nodes > 0)),
             "positive_fraction": float(np.mean(y_nodes > 0)),
-        })
+        }
+
+        if REPRESENTATION == "raw_activations":
+            matched_row["activation_file"] = row["activation_file"]
+
+        matched_rows.append(matched_row)
 
         if (i + 1) % 100 == 0:
             print(f"Processed {i + 1}/{len(mask_files)} mask files")
@@ -487,22 +588,37 @@ def main():
 
         print(f"\nBuilding train/test matrices for {n_features} features...")
 
-        X_train = build_X_for_split(
-            matched_df,
-            event_train_mask,
-            pc_scores_by_year,
-            all_nodes,
-            n_features,
-        )
+        if REPRESENTATION == "PCA":
+            X_train = build_X_for_split(
+                matched_df,
+                event_train_mask,
+                pc_scores_by_year,
+                all_nodes,
+                n_features,
+            )
 
-        X_test = build_X_for_split(
-            matched_df,
-            event_test_mask,
-            pc_scores_by_year,
-            all_nodes,
-            n_features,
-        )
+            X_test = build_X_for_split(
+                matched_df,
+                event_test_mask,
+                pc_scores_by_year,
+                all_nodes,
+                n_features,
+            )
 
+        elif REPRESENTATION == "raw_activations":
+            X_train = build_raw_X_for_split(
+                matched_df,
+                event_train_mask,
+                all_nodes,
+                n_features,
+            )
+
+            X_test = build_raw_X_for_split(
+                matched_df,
+                event_test_mask,
+                all_nodes,
+                n_features,
+            )
         y_train = y_train_all
         y_test = y_test_all
 
@@ -581,13 +697,32 @@ def main():
         print("Saved probe direction:", direction_out)
         print("Saved logistic model:", model_out)
 
-        y_test_prob, test_metrics = evaluate_split(
-            model,
-            X_test,
-            y_test,
-            "test",
-            threshold=0.5,
+        y_test_prob = model.predict_proba(X_test)[:, 1]
+
+        test_metrics = {
+            "test_average_precision": average_precision_score(y_test, y_test_prob),
+            "test_positive_rate": float(np.mean(y_test)),
+            "test_n_positive": int(np.sum(y_test)),
+            "test_n_total": int(len(y_test)),
+        }
+
+        if len(np.unique(y_test)) == 2:
+            test_metrics["test_roc_auc"] = roc_auc_score(y_test, y_test_prob)
+        else:
+            test_metrics["test_roc_auc"] = np.nan
+
+        best_f1_metrics = metrics_at_best_f1_threshold(
+            y_true=y_test,
+            y_prob=y_test_prob,
         )
+
+        test_metrics.update({
+            "test_best_threshold": best_f1_metrics["best_threshold"],
+            "test_f1": best_f1_metrics["f1"],
+            "test_precision": best_f1_metrics["precision"],
+            "test_recall": best_f1_metrics["recall"],
+        })
+        
 
         event_dfs = []
 
@@ -648,9 +783,10 @@ def main():
             f"{WEATHER_FEATURE} | Features={n_features:>3d} | "
             f"TEST AP={test_metrics['test_average_precision']:.3f} | "
             f"TEST AUC={test_metrics['test_roc_auc']:.3f} | "
-            f"TEST F1={test_metrics['test_f1']:.3f} | "
-            f"TEST P={test_metrics['test_precision']:.3f} | "
-            f"TEST R={test_metrics['test_recall']:.3f}"
+            f"BEST TEST F1={test_metrics['test_f1']:.3f} | "
+            f"threshold={test_metrics['test_best_threshold']:.6f} | "
+            f"P={test_metrics['test_precision']:.3f} | "
+            f"R={test_metrics['test_recall']:.3f}"
         )
 
         del X_train, X_test
