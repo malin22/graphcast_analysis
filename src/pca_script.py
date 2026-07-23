@@ -11,7 +11,6 @@ from graphcast import icosahedral_mesh
 from collections import Counter
 import re
 
-
 def load_activations(path: str) -> np.ndarray:
     """Load activation file, handling dtype conversions."""
     x = np.load(path, mmap_mode="r")
@@ -139,7 +138,7 @@ def plot_yearly_mean_pcs(
 
     print(f"Saved yearly mean PC maps from {valid_count} files to {out_dir}")
 
-def plot_cumulative_explained_variance(ipca, out_dir, max_components=None):
+def plot_cumulative_explained_variance(ipca, out_dir, max_components=None, output_tag="pca"):
     cumulative = np.cumsum(ipca.explained_variance_ratio_)
 
     if max_components is not None:
@@ -153,14 +152,47 @@ def plot_cumulative_explained_variance(ipca, out_dir, max_components=None):
     plt.ylim(0, 1.01)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, "pca_cumulative_explained_variance_2021_layer8.png"), dpi=300, bbox_inches="tight")
+    plt.savefig(os.path.join(out_dir, f"pca_cumulative_explained_variance_{output_tag}.png"), dpi=300, bbox_inches="tight")
     plt.close()
+
+def parse_timestamp_from_path(path: str) -> str:
+    name = os.path.basename(path)
+    return name.split("_t")[-1].replace(".npy", "")
+
+
+def collect_activation_files(acts_dirs, pattern):
+    """
+    Collect matching activation files from one or more directories.
+
+    acts_dirs can be:
+      - one string/path
+      - list of strings/paths
+    """
+    if isinstance(acts_dirs, (str, os.PathLike)):
+        acts_dirs = [acts_dirs]
+
+    all_files = []
+
+    for acts_dir in acts_dirs:
+        files = sorted(glob(os.path.join(str(acts_dir), pattern)))
+        print(f"Found {len(files)} files in {acts_dir}")
+        all_files.extend(files)
+
+    if not all_files:
+        raise FileNotFoundError(f"No files found for pattern {pattern} in {acts_dirs}")
+
+    # Sort by timestamp, then filename, so 2019/2020 are in chronological order.
+    all_files = sorted(all_files, key=lambda p: (parse_timestamp_from_path(p), p))
+
+    return all_files
+
 
 def run_pca(
     acts_dir: str,
     n_components: int = 20,
     batch_size: int = 10,
-    out_dir: str = "/share/prj-4d/graphcast_shared/data/pca_components/"
+    out_dir: str = "/share/prj-4d/graphcast_shared/data/pca_components/", 
+    output_tag: str = "2019_2020_layer8",
 ):
     """
     Fit IncrementalPCA on activation files, skip files with NaNs, and plot top PCs.
@@ -175,13 +207,9 @@ def run_pca(
 
     # Find all .npy files
     pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t*.npy"
-    npy_files = sorted(glob(os.path.join(acts_dir, pattern)))
-    #npy_files = sorted(glob(os.path.join(acts_dir, "*.npy")))
+    npy_files = collect_activation_files(acts_dir, pattern)
 
-    if not npy_files:
-        raise FileNotFoundError(f"No .npy files found in {acts_dir}")
-
-    print(f"Found {len(npy_files)} activation files")
+    print(f"Found {len(npy_files)} activation files in total")
 
 
     time_counts = Counter()
@@ -261,12 +289,12 @@ def run_pca(
     print(f"PCA mean vector shape: {ipca.mean_.shape}")
 
     # Save PCA basis for later reuse
-    np.save(os.path.join(out_dir, "pca_components_2021_layer8.npy"), ipca.components_)
-    np.save(os.path.join(out_dir, "pca_mean_2021_layer8.npy"), ipca.mean_)
+    np.save(os.path.join(out_dir, f"pca_components_{output_tag}.npy"), ipca.components_)
+    np.save(os.path.join(out_dir, f"pca_mean_{output_tag}.npy"), ipca.mean_)
     print(f"Saved PCA basis to {out_dir}/")
 
     # Plot cumulative explained variance
-    plot_cumulative_explained_variance(ipca, out_dir)
+    plot_cumulative_explained_variance(ipca, out_dir, output_tag=output_tag)
 
     # Print explained variance
     print("\nExplained variance ratio:")
@@ -278,7 +306,10 @@ def run_pca(
     return ipca
 
 if __name__ == "__main__":
-    ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2021"
+    ACTS_DIR = [ "/share/prj-4d/graphcast_shared/data/graphcast_activation_2019", 
+                "/share/prj-4d/graphcast_shared/data/graphcast_activation_2020",
+    ]
+
     PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only"
     #PLOTS_OUT    = "plots/2021_projected_on_2021"
 
@@ -287,6 +318,7 @@ if __name__ == "__main__":
         n_components=512,
         batch_size=10,
         out_dir=PCA_DIR,
+        output_tag="2019_2020_layer8",
   
     )
     

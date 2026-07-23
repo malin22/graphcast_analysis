@@ -4,8 +4,6 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=100G
-#SBATCH --error=logs/error.o%j
-#SBATCH --output=logs/output.o%j
 #SBATCH --output=logs/saving_weather_data%j.out
 #SBATCH --error=logs/saving_weather_data%j.err
 
