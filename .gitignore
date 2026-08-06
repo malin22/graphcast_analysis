@@ -7,4 +7,6 @@ graphcast
 plots/malins_experiments/2021_pc_spatial_pattern_stability/data
 plots/malins_experiments/2021_pc_correlations_per_timestep
 
+plots/2019_2020_pca_projected_on_2021
+
 *code-workspace
