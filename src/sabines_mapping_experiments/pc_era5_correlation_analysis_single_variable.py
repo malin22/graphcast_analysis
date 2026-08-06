@@ -72,7 +72,10 @@ DEFAULT_ERA5_ROOT = Path("/share/prj-4d/graphcast_shared/data/era5_daily_mesh/20
 PCA_COMPONENTS_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2020_layer8.npy" #to do: run pca from train or val set for correlation? open question 
 PCA_MEAN_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2020_layer8.npy" # to do: train or val pca?
 
-RESULTS_DIR = Path("plots/sabines_experiments/mapping_experiments/test_with_latlontime")
+DEFAULT_PC_SCORES_PATH = Path("/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2021_from_2019_2020_pca_per_timestep.npy")
+DEFAULT_PC_SCORES_FILES_LIST = Path("/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2021_per_timestep_files.txt")
+
+RESULTS_DIR = Path("plots/sabines_experiments/mapping_experiments/top_50_100_250_500_correlation_comparison") 
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 N_PCS_TO_CHECK = 20
@@ -158,6 +161,39 @@ def cyclic_time_features(center_str: str, lon_deg: np.ndarray):
         "year_progress_sin": np.full_like(lon_deg, np.sin(year_angle), dtype=np.float32),
         "year_progress_cos": np.full_like(lon_deg, np.cos(year_angle), dtype=np.float32),
     }
+
+def build_pc_scores_row_mapping(
+    pc_scores_all: np.ndarray,
+    pc_scores_files_list: Path,
+) -> dict[str, int]:
+    """
+    Build center_str -> pc_scores_all row index mapping from the
+    authoritative files-list manifest (one activation file path per line,
+    in the same row order as pc_scores_all).
+    """
+    with open(pc_scores_files_list) as f:
+        lines = [line.strip() for line in f if line.strip()]
+
+    if len(lines) != pc_scores_all.shape[0]:
+        raise ValueError(
+            f"{pc_scores_files_list} lists {len(lines)} files but "
+            f"pc_scores_all has {pc_scores_all.shape[0]} rows -- these must "
+            "match exactly for row indexing to be trustworthy."
+        )
+
+    mapping = {}
+    for i, line in enumerate(lines):
+        path_str = line.split("\t")[0]
+        center_str = parse_center_time(Path(path_str))
+        if center_str in mapping:
+            raise ValueError(
+                f"Duplicate center_str {center_str!r} found in "
+                f"{pc_scores_files_list} at row {i} (already mapped to row "
+                f"{mapping[center_str]})"
+            )
+        mapping[center_str] = i
+
+    return mapping
 
 
 # ============================================================
@@ -435,6 +471,9 @@ def run_single_variable_analysis(
     summary_path: Path,
     force_recompute: bool = False,
     max_timesteps: int | None = None,
+    pc_scores_path: Path = DEFAULT_PC_SCORES_PATH,
+    pc_scores_files_list: Path = DEFAULT_PC_SCORES_FILES_LIST,
+    recompute_pc_scores: bool = False,
 ):
     if cache_path.exists() and not force_recompute:
         with open(cache_path, "r") as f:
@@ -467,12 +506,39 @@ def run_single_variable_analysis(
 
     pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t*.npy"
     activation_files = sorted(activations_dir.glob(pattern))
-    #activation_files = sorted(activations_dir.glob("*.npy"))
     if max_timesteps is not None:
         activation_files = activation_files[:max_timesteps]
 
     centers = [parse_center_time(p) for p in activation_files]
     print(f"Found {len(activation_files)} activation files")
+
+    # --- NEW: load precomputed PC scores + mapping ---
+    pc_scores_all = None
+    center_to_pc_row = {}
+    if not recompute_pc_scores:
+        pc_scores_all = np.load(pc_scores_path, mmap_mode="r")
+
+        if pc_scores_all.shape[1] != n_m6_nodes:
+            raise ValueError(
+                f"pc_scores_path has {pc_scores_all.shape[1]} nodes but "
+                f"expected the full m6 mesh ({n_m6_nodes} nodes)."
+            )
+
+        if pc_scores_all.shape[2] < n_pcs:
+            raise ValueError(
+                f"pc_scores_path only has {pc_scores_all.shape[2]} PC components "
+                f"but n_pcs={n_pcs} were requested."
+            )
+
+        center_to_pc_row = build_pc_scores_row_mapping(
+            pc_scores_all=pc_scores_all,
+            pc_scores_files_list=pc_scores_files_list,
+        )
+        print(
+            f"Loaded PC-score row mapping for {len(center_to_pc_row)} "
+            f"timesteps from {pc_scores_files_list}"
+        )
+    # --- end NEW ---
 
     pc_stats = defaultdict(lambda: defaultdict(lambda: {"sum_abs_r": 0.0, "count": 0, "wins": 0}))
     processed_timesteps = 0
@@ -484,13 +550,6 @@ def run_single_variable_analysis(
             print("  Skipping: no matching ERA5 mesh timestep")
             continue
 
-        activations = load_activation_matrix(act_file)
-        activations = select_activation_nodes(
-            activations=activations,
-            selected_m6_indices=selected_indices,
-            n_m6_nodes=n_m6_nodes,
-        )
-
         feature_names, era5_nodes = load_mesh_feature_nodes(
             time_index=time_index,
             time_series=time_series,
@@ -500,20 +559,40 @@ def run_single_variable_analysis(
             vertices=era5_m6_vertices,
             include_context=True,
             include_year_progress=False,
-)
+        )
 
         if era5_nodes.size == 0:
             print("  Skipping: no ERA5 fields loaded")
-            del activations
             gc.collect()
             continue
 
-        pc_names, pc_nodes = project_activations_to_pc_nodes(
-            activations=activations,
-            pca_mean=pca_mean,
-            pca_components=pca_components,
-            n_pcs=n_pcs,
-        )
+        # --- NEW: precomputed vs. on-the-fly PC projection ---
+        if recompute_pc_scores:
+            activations = load_activation_matrix(act_file)
+            activations = select_activation_nodes(
+                activations=activations,
+                selected_m6_indices=selected_indices,
+                n_m6_nodes=n_m6_nodes,
+            )
+            pc_names, pc_nodes = project_activations_to_pc_nodes(
+                activations=activations,
+                pca_mean=pca_mean,
+                pca_components=pca_components,
+                n_pcs=n_pcs,
+            )
+            del activations
+        else:
+            pc_row = center_to_pc_row.get(center_str)
+            if pc_row is None:
+                print(f"  Skipping {center_str}: no precomputed PC score for this timestep")
+                gc.collect()
+                continue
+            # pc_scores_all[pc_row]: [n_nodes_full_mesh, n_pc_components]
+            pc_nodes = np.asarray(
+                pc_scores_all[pc_row, selected_indices, :n_pcs].T, dtype=np.float32
+            )  # [n_pcs, n_selected_nodes]
+            pc_names = [f"PC_{i + 1}" for i in range(n_pcs)]
+        # --- end NEW ---
 
         corr_matrix, n_used = batch_correlation_matrix(
             P=pc_nodes,
@@ -523,7 +602,7 @@ def run_single_variable_analysis(
 
         if corr_matrix is None:
             print(f"  Skipping: not enough valid nodes ({n_used})")
-            del activations, era5_nodes, pc_nodes
+            del era5_nodes, pc_nodes
             gc.collect()
             continue
 
@@ -543,9 +622,7 @@ def run_single_variable_analysis(
             best_r = float(row[best_j])
 
             if VERBOSE_TIMESTEPS:
-                print(
-                    f"  {pc_name}: top variable = {best_name}, r={best_r:.3f}"
-                )
+                print(f"  {pc_name}: top variable = {best_name}, r={best_r:.3f}")
 
             for j, feature_name in enumerate(feature_names):
                 r = row[j]
@@ -560,7 +637,7 @@ def run_single_variable_analysis(
 
         processed_timesteps += 1
 
-        del activations, era5_nodes, pc_nodes, corr_matrix
+        del era5_nodes, pc_nodes, corr_matrix
         gc.collect()
 
     cache = {}
@@ -657,12 +734,28 @@ def main():
         "--force-recompute-screening",
         action="store_true",
         help="Recompute and overwrite existing cache.",
+
+    )
+    parser.add_argument(
+        "--pc-scores-path",
+        type=Path,
+        default=DEFAULT_PC_SCORES_PATH,
+    )
+    parser.add_argument(
+        "--pc-scores-files-list",
+        type=Path,
+        default=DEFAULT_PC_SCORES_FILES_LIST,
+    )
+    parser.add_argument(
+        "--recompute-pc-scores",
+        action="store_true",
+        help="Fall back to on-the-fly projection instead of the precomputed array.",
     )
 
     args = parser.parse_args()
 
-    cache_path = RESULTS_DIR / f"pc_era5_mesh_m{args.mesh_level}_screening_cache.json"
-    summary_path = RESULTS_DIR / f"pc_era5_mesh_m{args.mesh_level}_yearly_top_variables.json"
+    cache_path = RESULTS_DIR / f"correlation_pc_era5_mesh_m{args.mesh_level}_screening_cache.json"
+    summary_path = RESULTS_DIR / f"correlation_pc_era5_mesh_m{args.mesh_level}_yearly_top_variables.json"
 
     run_single_variable_analysis(
         activations_dir=args.activations_dir,
@@ -673,8 +766,10 @@ def main():
         summary_path=summary_path,
         force_recompute=args.force_recompute_screening,
         max_timesteps=args.max_timesteps,
+        pc_scores_path=args.pc_scores_path,
+        pc_scores_files_list=args.pc_scores_files_list,
+        recompute_pc_scores=args.recompute_pc_scores,
     )
-
 
 if __name__ == "__main__":
     main()

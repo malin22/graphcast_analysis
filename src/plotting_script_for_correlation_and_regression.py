@@ -12,7 +12,7 @@ import numpy as np
 To run without the slurm script: 
 
 python -u /home/student/s/sascholle/share/graphcast_analysis/src/plotting_script_for_correlation_and_regression.py \
-  --correlation-json plots/sabines_experiments/mapping_experiments/correlation_regression_json_results_depreciated/pc_era5_mesh_m5_screening_cache.json \
+  --correlation-json plots/sabines_experiments/mapping_experiments/pc_era5_mesh_m6_screening_cache.json \
   --out-dir plots/sabines_experiments/mapping_experiments/histograms \
   --pcs 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 \
   --per-pc \
@@ -471,6 +471,49 @@ def annotate_top_k_bars(ax, scores, y, k=3, x_max=None, color="black"):
             color=color,
         )
 
+def filter_scores_by_threshold(scores_by_pc, pcs=None, cutoff=0.3):
+    """
+    Keep only per-PC features whose raw correlation strength passes the cutoff.
+    """
+    pcs = get_selected_pcs(scores_by_pc, pcs)
+    filtered = {}
+
+    for pc in pcs:
+        pc_scores = scores_by_pc.get(pc, {})
+        filtered[pc] = {
+            feature: float(score)
+            for feature, score in pc_scores.items()
+            if np.isfinite(score) and abs(float(score)) >= cutoff
+        }
+
+    return filtered
+
+
+def write_cutoff_report(scores_by_pc, pcs, cutoff, output_path, score_name="score"):
+    """
+    Write one row per surviving PC-feature pair after thresholding.
+    """
+    pcs = get_selected_pcs(scores_by_pc, pcs)
+
+    with open(output_path, "w") as f:
+        f.write(f"pc,feature,label,category,{score_name}\n")
+
+        for pc in pcs:
+            filtered_pc_scores = {
+                feature: float(score)
+                for feature, score in scores_by_pc.get(pc, {}).items()
+                if np.isfinite(score) and abs(float(score)) >= cutoff
+            }
+
+            rows = build_plot_rows(filtered_pc_scores)
+
+            for r in rows:
+                f.write(
+                    f"{pc},{r['feature']},{r['label']},{r['category']},{r['score']:.8g}\n"
+                )
+
+    print(f"Saved {output_path}")
+
 
 def plot_rows(rows, title, score_label, output_path, add_smooth=True):
     if not rows:
@@ -767,21 +810,47 @@ def main():
         type=int,
         default=4,
         help="Number of columns for per-PC grid plots.",
-    )    
+    )   
+    parser.add_argument(
+        "--correlation-cutoff",
+        type=float,
+        default=0.0,
+        help="Minimum abs(raw correlation) for a PC-feature pair to survive.",
+    )
+    parser.add_argument(
+        "--regression-cutoff",
+        type=float,
+        default=0.0, #default low for regression because normalized coefficients are often smaller and we do not want to accidentally hide everything.
+        help=(
+            "Minimum abs regression importance for a PC-feature pair to survive. "
+            "Applied after abs() and after optional per-PC normalization."
+        ),
+    )
+    parser.add_argument(
+        "--write-cutoff-report",
+        action="store_true",
+        help="Write a CSV of all PC-feature pairs that pass the cutoff.",
+    ) 
 
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     pcs = parse_pc_list(args.pcs)
 
-    # correlation block
+    
     if args.correlation_json is None and args.regression_json is None:
         raise ValueError("Provide at least --correlation-json or --regression-json")
-
+    
+   # correlation block
     if args.correlation_json is not None:
         data = load_json(args.correlation_json)
         scores_by_pc = extract_correlation_scores(data, score_key="mean_abs_r")
-        agg = aggregate_scores(scores_by_pc, pcs=pcs, aggregation=args.aggregation)
+        filtered_scores_by_pc = filter_scores_by_threshold(
+            scores_by_pc,
+            pcs=pcs,
+            cutoff=args.correlation_cutoff,
+        )
+        agg = aggregate_scores(filtered_scores_by_pc, pcs=pcs, aggregation=args.aggregation)
         rows = build_plot_rows(agg)
 
         suffix = "selected_pcs" if pcs else "all_pcs"
@@ -797,10 +866,18 @@ def main():
         )
         write_csv(rows, out_csv)
 
+        if args.write_cutoff_report:
+            write_cutoff_report(
+                scores_by_pc,
+                pcs=pcs,
+                cutoff=args.correlation_cutoff,
+                output_path=args.out_dir / f"correlation_cutoff_report_{suffix}.csv",
+    )
+
         if args.per_pc:
             if args.per_pc_layout in ("grid", "both"):
                 plot_per_pc_grid(
-                    scores_by_pc=scores_by_pc,
+                    scores_by_pc=filtered_scores_by_pc,
                     pcs=pcs,
                     title="Correlation variable importance per PC",
                     score_label="Mean absolute spatial Pearson r",
@@ -810,7 +887,7 @@ def main():
 
             if args.per_pc_layout in ("separate", "both"):
                 plot_per_pc_separate(
-                    scores_by_pc=scores_by_pc,
+                    scores_by_pc=filtered_scores_by_pc,
                     pcs=pcs,
                     title_prefix="Correlation variable importance",
                     score_label="Mean absolute spatial Pearson r",
@@ -828,7 +905,14 @@ def main():
             use_abs=True,
             normalize=not args.regression_no_normalize,
         )
-        agg = aggregate_scores(scores_by_pc, pcs=pcs, aggregation=args.aggregation)
+
+        filtered_scores_by_pc = filter_scores_by_threshold(
+            scores_by_pc,
+            pcs=pcs,
+            cutoff=args.regression_cutoff,
+        )
+
+        agg = aggregate_scores(filtered_scores_by_pc, pcs=pcs, aggregation=args.aggregation)
         rows = build_plot_rows(agg)
 
         suffix = "selected_pcs" if pcs else "all_pcs"
@@ -848,7 +932,7 @@ def main():
         if args.per_pc:
             if args.per_pc_layout in ("grid", "both"):
                 plot_per_pc_grid(
-                    scores_by_pc=scores_by_pc,
+                    scores_by_pc=filtered_scores_by_pc,
                     pcs=pcs,
                     title=f"Regression variable importance per PC ({norm_label})",
                     score_label="Normalized absolute regression weight" if not args.regression_no_normalize else "Absolute regression weight",
@@ -858,7 +942,7 @@ def main():
 
             if args.per_pc_layout in ("separate", "both"):
                 plot_per_pc_separate(
-                    scores_by_pc=scores_by_pc,
+                    scores_by_pc=filtered_scores_by_pc,
                     pcs=pcs,
                     title_prefix=f"Regression variable importance ({norm_label})",
                     score_label="Normalized absolute regression weight" if not args.regression_no_normalize else "Absolute regression weight",

@@ -241,7 +241,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Compute circular PC spatial-pattern recurrence."
     )
-    parser.add_argument("--years", type=int, nargs="+", default=[2020, 2021])
+    parser.add_argument("--years", type=int, nargs="+", default=[2019, 2020, 2021])
     parser.add_argument("--activation-template", default=DEFAULT_ACTIVATION_TEMPLATE)
     parser.add_argument("--pc-indices", type=int, nargs="+", default=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     parser.add_argument("--max-lag-days", type=int, default=730)

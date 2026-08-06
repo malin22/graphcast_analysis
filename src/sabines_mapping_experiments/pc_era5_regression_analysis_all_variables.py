@@ -43,11 +43,16 @@ DEFAULT_VARS = [
 DEFAULT_ACTIVATIONS_DIR = Path("/share/prj-4d/graphcast_shared/data/graphcast_activation_2021") #val set 2021
 DEFAULT_ERA5_ROOT = Path("/share/prj-4d/graphcast_shared/data/era5_daily_mesh/2021/mesh_l6") #val set 2021
 
-PCA_COMPONENTS_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2020_layer8.npy" #train set coordinates 2019/2020
-PCA_MEAN_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2020_layer8.npy"  #train set coordinates 2019/2020
+PCA_COMPONENTS_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2019_2020_layer8.npy" #train set coordinates 2019/2020
+PCA_MEAN_PATH = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2019_2020_layer8.npy"  #train set coordinates 2019/2020
 
-RESULTS_DIR = Path("plots/sabines_experiments/mapping_experiments/test_withlatlontime")
+RESULTS_DIR = Path("plots/sabines_experiments/mapping_experiments/top_50_pcs")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+DEFAULT_PC_SCORES_PATH = Path(
+    "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/"
+    "pc_scores_2021_from_2019_2020_pca_per_timestep.npy"
+)
 
 MIN_POINTS = 10
 
@@ -121,6 +126,40 @@ def cyclic_time_features(center_str: str, lon_deg: np.ndarray):
         "year_progress_sin": np.full_like(lon_deg, np.sin(year_angle), dtype=np.float32),
         "year_progress_cos": np.full_like(lon_deg, np.cos(year_angle), dtype=np.float32),
     }
+
+def build_pc_scores_row_mapping(
+    pc_scores_all: np.ndarray,
+    pc_scores_files_list: Path,
+) -> dict[str, int]:
+    """
+    Build center_str -> pc_scores_all row index mapping from the
+    authoritative files-list manifest (one activation file path per line,
+    in the same row order as pc_scores_all).
+    """
+    with open(pc_scores_files_list) as f:
+        lines = [line.strip() for line in f if line.strip()]
+
+    if len(lines) != pc_scores_all.shape[0]:
+        raise ValueError(
+            f"{pc_scores_files_list} lists {len(lines)} files but "
+            f"pc_scores_all has {pc_scores_all.shape[0]} rows -- these must "
+            "match exactly for row indexing to be trustworthy."
+        )
+
+    mapping = {}
+    for i, line in enumerate(lines):
+        # Each line may be "path" or "path\tsize" -- take the path only.
+        path_str = line.split("\t")[0]
+        center_str = parse_center_time(Path(path_str))
+        if center_str in mapping:
+            raise ValueError(
+                f"Duplicate center_str {center_str!r} found in "
+                f"{pc_scores_files_list} at row {i} (already mapped to row "
+                f"{mapping[center_str]})"
+            )
+        mapping[center_str] = i
+
+    return mapping
 
 
 # ============================================================
@@ -269,6 +308,7 @@ def load_era5_X_for_timestep(
 # ============================================================
 # PCA PROJECTION
 # ============================================================
+
 def project_pc(activations, pca_mean, pca_components, pc_idx: int):
     if activations.shape[1] != pca_mean.shape[0]:
         raise ValueError(
@@ -291,56 +331,104 @@ def finite_and_optional_sample(X, y, max_nodes=None, rng=None):
     return X[idx], y[idx]
 
 
+
+
 # ============================================================
 # REGRESSION
 # ============================================================
-def fit_with_alpha_grid(X_train_z, y_train_z, X_val_z, y_val_z, model_type, alpha_grid, l1_ratio):
+def fit_full_grid(X_train_z, y_train_z, X_val_z, y_val_z, model_type, alpha_grid, l1_ratio_grid):
+    """
+    Sweep alpha x l1_ratio and return every fitted result (not just the best),
+    so downstream analysis can trade off val_r2 against sparsity.
+
+    Returns:
+      grid_results: list[dict] with l1_ratio, alpha, val_r2, n_nonzero, coef
+      best_model: the ElasticNet/LinearRegression model object for the
+                   highest-val_r2 point (kept for convenience/back-compat;
+                   selection logic for "best" should generally happen
+                   downstream using grid_results, not this).
+    """
     model_type = model_type.lower()
 
     if model_type in ("linear", "linearregression", "ols"):
         print("  fitting LinearRegression", flush=True)
         model = LinearRegression(fit_intercept=True)
         model.fit(X_train_z, y_train_z)
-        score = float(model.score(X_val_z, y_val_z))
-        return model, score, None
+        val_r2 = float(model.score(X_val_z, y_val_z))
+        coef = np.asarray(model.coef_, dtype=np.float32)
+        grid_results = [{
+            "l1_ratio": None,
+            "alpha": None,
+            "val_r2": val_r2,
+            "n_nonzero": int(np.sum(np.abs(coef) > 1e-8)),
+            "n_features": int(len(coef)),
+        }]
+        return grid_results, model
 
+    grid_results = []
     best_model = None
-    best_score = -np.inf
-    best_alpha = None
+    best_val_r2 = -np.inf
 
-    for alpha_i, alpha in enumerate(alpha_grid, start=1):
-        print(
-            f"  fitting alpha {alpha_i}/{len(alpha_grid)}: {alpha}",
-            flush=True,
-        )
+    total = len(l1_ratio_grid) * len(alpha_grid)
+    done = 0
 
-        if model_type == "ridge":
-            model = Ridge(alpha=float(alpha), fit_intercept=True)
-        elif model_type == "lasso":
-            model = Lasso(alpha=float(alpha), fit_intercept=True, max_iter=30000, tol=1e-4)
-        elif model_type == "elasticnet":
-            model = ElasticNet(
-                alpha=float(alpha),
-                l1_ratio=float(l1_ratio),
-                fit_intercept=True,
-                max_iter=5000,
-                tol=1e-3,
-                random_state=0,
-                selection="random",
-                precompute=True,
+    for l1_ratio in l1_ratio_grid:
+        for alpha in alpha_grid:
+            done += 1
+            print(
+                f"  fitting {done}/{total}: l1_ratio={l1_ratio}, alpha={alpha}",
+                flush=True,
             )
-        else:
-            raise ValueError("model_type must be Linear, Ridge, Lasso, or ElasticNet")
 
-        model.fit(X_train_z, y_train_z)
-        score = model.score(X_val_z, y_val_z)
+            if float(l1_ratio) == 0.0:
+                # sklearn's ElasticNet disallows l1_ratio=0; Ridge is the
+                # equivalent limiting case.
+                model = Ridge(alpha=float(alpha), fit_intercept=True)
+            else:
+                model = ElasticNet(
+                    alpha=float(alpha),
+                    l1_ratio=float(l1_ratio),
+                    fit_intercept=True,
+                    max_iter=5000,
+                    tol=1e-3,
+                    random_state=0,
+                    selection="random",
+                    precompute=True,
+                )
 
-        if score > best_score:
-            best_model = model
-            best_score = float(score)
-            best_alpha = float(alpha)
+            model.fit(X_train_z, y_train_z)
+            val_r2 = float(model.score(X_val_z, y_val_z))
+            coef = np.asarray(model.coef_, dtype=np.float32)
+            n_nonzero = int(np.sum(np.abs(coef) > 1e-8))
 
-    return best_model, best_score, best_alpha
+            grid_results.append({
+                "l1_ratio": float(l1_ratio),
+                "alpha": float(alpha),
+                "val_r2": val_r2,
+                "n_nonzero": n_nonzero,
+                "n_features": int(len(coef)),
+            })
+
+            if val_r2 > best_val_r2:
+                best_val_r2 = val_r2
+                best_model = model
+
+    return grid_results, best_model
+
+
+def select_by_tolerance(grid_results, r2_tolerance=0.02):
+    """
+    Among grid points within r2_tolerance of the best val_r2, pick the
+    sparsest (fewest nonzero coefficients). Falls back to best-by-r2 if
+    grid_results has only one entry (e.g. Linear).
+    """
+    if len(grid_results) == 1:
+        return grid_results[0]
+
+    best_r2 = max(r["val_r2"] for r in grid_results)
+    threshold = best_r2 - r2_tolerance
+    candidates = [r for r in grid_results if r["val_r2"] >= threshold]
+    return min(candidates, key=lambda r: r["n_nonzero"])
 
 def rank_coefficients(feature_names, coefs):
     rows = [
@@ -409,6 +497,28 @@ def run_regression(args):
     
     usable = [(p, parse_center_time(p)) for p in activation_files if parse_center_time(p) in time_index]
 
+    # --- NEW: load precomputed PC scores + build center_str -> array-index map ---
+    pc_scores_all = None
+    center_to_pc_row = {}
+    if not args.recompute_pc_scores:
+        pc_scores_all = np.load(args.pc_scores_path, mmap_mode="r")
+
+        if pc_scores_all.shape[1] != n_m6_nodes:
+            raise ValueError(
+                f"pc_scores_path has {pc_scores_all.shape[1]} nodes but "
+                f"expected the full m6 mesh ({n_m6_nodes} nodes)."
+            )
+
+        center_to_pc_row = build_pc_scores_row_mapping(
+            pc_scores_all=pc_scores_all,
+            pc_scores_files_list=args.pc_scores_files_list,
+        )
+        print(
+            f"Loaded PC-score row mapping for {len(center_to_pc_row)} "
+            f"timesteps from {args.pc_scores_files_list}"
+        )
+    # --- end NEW ---
+
     if args.max_timesteps is not None:
         usable = usable[: args.max_timesteps]
 
@@ -424,14 +534,15 @@ def run_regression(args):
     else:
         pc_indices = list(range(min(args.n_pcs, pca_components.shape[0])))
 
-        if args.model_type.lower() in ("linear", "linearregression", "ols"):
-            alpha_grid = None
-        elif args.alpha_grid:
-            alpha_grid = np.array(args.alpha_grid, dtype=np.float64)
-        elif args.model_type.lower() == "ridge":
-            alpha_grid = np.logspace(-3, 4, 20)
-        else:
-            alpha_grid = np.logspace(-3, 1, 16)
+    if args.model_type.lower() in ("linear", "linearregression", "ols"):
+        alpha_grid = None
+        l1_ratio_grid = None
+    elif args.alpha_grid:
+        alpha_grid = np.array(args.alpha_grid, dtype=np.float64)
+        l1_ratio_grid = np.array(args.l1_ratio_grid, dtype=np.float64)
+    else:
+        alpha_grid = np.logspace(-3, 1, 16)
+        l1_ratio_grid = np.array(args.l1_ratio_grid, dtype=np.float64)
 
     results = {}
 
@@ -456,8 +567,8 @@ def run_regression(args):
                         f"  {split_name}: loaded {step_i}/{len(steps)} timesteps",
                         flush=True,
                     )
-                activations = load_activation_matrix(act_file)
-                activations = select_activation_nodes(activations, selected_indices, n_m6_nodes)
+                #activations = load_activation_matrix(act_file)
+                #activations = select_activation_nodes(activations, selected_indices, n_m6_nodes)
 
                 feature_names, era5_nodes = load_era5_X_for_timestep(
                     time_index=time_index,
@@ -479,7 +590,19 @@ def run_regression(args):
                     continue
                 X = era5_nodes.T  # [nodes, features]
 
-                y = project_pc(activations, pca_mean, pca_components, pc_idx)
+                if args.recompute_pc_scores:
+                    activations = load_activation_matrix(act_file)
+                    activations = select_activation_nodes(activations, selected_indices, n_m6_nodes)
+                    y = project_pc(activations, pca_mean, pca_components, pc_idx)
+                    del activations
+                else:
+                    pc_row = center_to_pc_row.get(center_str)
+                    if pc_row is None:
+                        print(f"  Skipping {center_str}: no precomputed PC score for this timestep")
+                        continue
+                    y = np.asarray(
+                        pc_scores_all[pc_row, selected_indices, pc_idx], dtype=np.float32
+                    )
 
                 X_use, y_use = finite_and_optional_sample(
                     X,
@@ -487,7 +610,6 @@ def run_regression(args):
                     max_nodes=args.max_nodes_per_timestep,
                     rng=rng,
                 )
-
                 if X_use is None:
                     continue
 
@@ -498,8 +620,9 @@ def run_regression(args):
                     X_val_blocks.append(X_use)
                     y_val_blocks.append(y_use)
 
-                del activations, X, y, X_use, y_use
+                del X, y, X_use, y_use
                 gc.collect()
+
 
         if not X_train_blocks or not X_val_blocks:
             print(f"Skipping PC_{pc_idx + 1}: not enough train/validation data")
@@ -518,15 +641,40 @@ def run_regression(args):
         X_val_z = x_scaler.transform(X_val)
         y_val_z = y_scaler.transform(y_val.reshape(-1, 1)).ravel()
 
-        model, val_r2, alpha = fit_with_alpha_grid(
+        grid_results, best_model = fit_full_grid(
             X_train_z,
             y_train_z,
             X_val_z,
             y_val_z,
             args.model_type,
             alpha_grid,
-            args.l1_ratio,
+            l1_ratio_grid,
         )
+
+        chosen = select_by_tolerance(grid_results, r2_tolerance=args.r2_tolerance)
+
+        # refit the chosen (l1_ratio, alpha) to get its coefficients
+        # (grid search above didn't retain every model object to save memory)
+        if chosen["l1_ratio"] is None:
+            model = LinearRegression(fit_intercept=True)
+        elif chosen["l1_ratio"] == 0.0:
+            model = Ridge(alpha=chosen["alpha"], fit_intercept=True)
+        else:
+            model = ElasticNet(
+                alpha=chosen["alpha"],
+                l1_ratio=chosen["l1_ratio"],
+                fit_intercept=True,
+                max_iter=5000,
+                tol=1e-3,
+                random_state=0,
+                selection="random",
+                precompute=True,
+            )
+        model.fit(X_train_z, y_train_z)
+
+        val_r2 = chosen["val_r2"]
+        alpha = chosen["alpha"]
+        l1_ratio_chosen = chosen["l1_ratio"]
 
         coef_std = np.asarray(model.coef_, dtype=np.float32)
         ranked = rank_coefficients(feature_names_ref, coef_std)
@@ -538,8 +686,9 @@ def run_regression(args):
             "mesh_level": int(args.mesh_level),
             "n_selected_nodes": int(n_selected_nodes),
             "model_type": args.model_type,
-            "alpha": None if alpha is None else float(alpha),
-            "l1_ratio": float(args.l1_ratio) if args.model_type.lower() == "elasticnet" else None,
+            "alpha": alpha, 
+            "l1_ratio": l1_ratio_chosen,
+            "r2_tolerance": float(args.r2_tolerance),
             "val_r2": float(val_r2),
             "n_features": int(len(feature_names_ref)),
             "feature_names": feature_names_ref,
@@ -555,12 +704,13 @@ def run_regression(args):
             "train_timesteps": int(len(train_steps)),
             "val_timesteps": int(len(val_steps)),
             "max_nodes_per_timestep": args.max_nodes_per_timestep,
+            "grid_search": grid_results,   # NEW: full alpha x l1_ratio sweep
         }
 
         results[f"PC_{pc_idx + 1}"] = result
         atomic_write_json(args.output_path, results)
 
-        print(f"PC_{pc_idx + 1}: val R2 = {val_r2:.4f}, alpha = {alpha}")
+        print(f"PC_{pc_idx + 1}: val R2 = {val_r2:.4f}, alpha = {alpha}, l1_ratio = {l1_ratio_chosen}")
         print("Top standardized coefficients:")
         for row in ranked[:10]:
             print(row)
@@ -579,8 +729,20 @@ def main():
     parser.add_argument("--activations-dir", type=Path, default=DEFAULT_ACTIVATIONS_DIR)
     parser.add_argument("--era5-root", type=Path, default=DEFAULT_ERA5_ROOT)
     parser.add_argument("--mesh-level", type=int, choices=[0, 1, 2, 3, 4, 5, 6], default=6)
-    parser.add_argument("--model-type", choices=["Linear", "Ridge", "Lasso", "ElasticNet"], default="Ridge")
-    parser.add_argument("--l1-ratio", type=float, default=0.5)
+    parser.add_argument("--model-type", choices=["Linear", "Ridge", "Lasso", "ElasticNet"], default="ElasticNet")
+    parser.add_argument(
+        "--l1-ratio-grid",
+        type=float,
+        nargs="*",
+        default=[0.0, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9, 1.0],
+        help="l1_ratio values to sweep (0=Ridge-like, 1=Lasso-like).",
+    )
+    parser.add_argument(
+        "--r2-tolerance",
+        type=float,
+        default=0.02,
+        help="Accept models within this much val_r2 of the best, then pick sparsest.",
+    )
     parser.add_argument("--n-pcs", type=int, default=20)
     parser.add_argument("--pc-indices", type=int, nargs="*", default=None)
     parser.add_argument("--train-fraction", type=float, default=0.8)
@@ -596,12 +758,26 @@ def main():
         default=None,
         help="Where to save regression JSON. Defaults to results dir by mesh/model.",
     )
+    parser.add_argument("--pc-scores-path", type=Path, default=DEFAULT_PC_SCORES_PATH)
+    parser.add_argument(
+        "--pc-scores-files-list",
+        type=Path,
+        default=Path(
+            "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/"
+            "pc_scores_2021_per_timestep_files.txt"
+        ),
+    )
+    parser.add_argument(
+        "--recompute-pc-scores",
+        action="store_true",
+        help="Fall back to on-the-fly projection via project_pc instead of the precomputed array.",
+    )
 
     args = parser.parse_args()
 
     if args.output_path is None:
         model = args.model_type.lower()
-        args.output_path = RESULTS_DIR / f"pc_era5_mesh_m{args.mesh_level}_allvars_{model}_results.json"
+        args.output_path = RESULTS_DIR / f"regression_pc_era5_mesh_m{args.mesh_level}_allvars_{model}_results.json"
 
     run_regression(args)
 

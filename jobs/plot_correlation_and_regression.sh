@@ -19,14 +19,17 @@ source /home/student/s/sascholle/miniconda3/etc/profile.d/conda.sh
 conda activate graphcast312
 
 srun python -u /home/student/s/sascholle/share/graphcast_analysis/src/plotting_script_for_correlation_and_regression.py \
-  --correlation-json plots/sabines_experiments/mapping_experiments/test_withlatlontime/pc_era5_mesh_m6_screening_cache.json \
-  --out-dir plots/sabines_experiments/mapping_experiments/histograms \
-  --pcs 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 \
+  --out-dir plots/sabines_experiments/mapping_experiments/histograms/top_512_pcs_histo/histo_with_cutoff \
   --per-pc \
   --per-pc-layout grid \
   --aggregation mean \
-  --regression-json plots/sabines_experiments/mapping_experiments/test_withlatlontime/pc_era5_mesh_m6_allvars_linear_results.json \
-
+  --regression-json plots/sabines_experiments/mapping_experiments/top_512_pcs/regression_pc_era5_mesh_m6_allvars_linear_results.json \
+  --regression-cutoff 0.1 \
+  #--regression-no-normalize \
+  #--correlation-json plots/sabines_experiments/mapping_experiments/top_512_pcs/correlation_pc_era5_mesh_m6_screening_cache.json \
+  #--correlation-cutoff 0.3 \
+  #--pcs 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 \
+  #--regression-json plots/sabines_experiments/mapping_experiments/top_512_pcs/regression_pc_era5_mesh_m6_allvars_elasticnet_results.json \
 
 echo "Finished at: $(date)"
 

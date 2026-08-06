@@ -306,29 +306,26 @@ def run_pca(
     return ipca
 
 if __name__ == "__main__":
-    ACTS_DIR = [ "/share/prj-4d/graphcast_shared/data/graphcast_activation_2019", 
-                "/share/prj-4d/graphcast_shared/data/graphcast_activation_2020",
-    ]
-
+    ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2021" # can also pass in a list for running ipca on multiple years
     PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only"
     #PLOTS_OUT    = "plots/2021_projected_on_2021"
 
-    ipca = run_pca(
-        acts_dir=ACTS_DIR,
-        n_components=512,
-        batch_size=10,
-        out_dir=PCA_DIR,
-        output_tag="2019_2020_layer8",
+    # ipca = run_pca(
+    #     acts_dir=ACTS_DIR,
+    #     n_components=512,
+    #     batch_size=10,
+    #     out_dir=PCA_DIR,
+    #     output_tag="2019_2020_layer8",
   
-    )
+    # )
     
 
-    # plot_yearly_mean_pcs(
-    #     acts_dir=ACTS_DIR,
-    #     pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_components_2020_layer8.npy',
-    #     pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/pca_mean_2020_layer8.npy',
-    #     out_dir="plots/2020_pca_projected_on_2020",
-    #     n_top_pcs=10,
-    #     use_last_pcs=True,
-    #     scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
-    # )
+    plot_yearly_mean_pcs(
+        acts_dir=ACTS_DIR,
+        pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2019_2020_layer8.npy',
+        pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2019_2020_layer8.npy',
+        out_dir="plots/2019_2020_pca_projected_on_2021",
+        n_top_pcs=512,
+        use_last_pcs=False,
+        scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
+    )
