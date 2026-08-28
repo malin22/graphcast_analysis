@@ -22,6 +22,7 @@ from sklearn.metrics import (
 from malins_helper_scripts.mesh_context import (
     get_coarse_mesh_node_indices,
     vertices_to_latlon,
+    get_mesh_latlon
 )
 
 from malins_helper_scripts.activation_preprocessing import (
@@ -30,8 +31,6 @@ from malins_helper_scripts.activation_preprocessing import (
     load_pca_metadata,
     load_raw_activation_years,
 )
-
-from graphcast import icosahedral_mesh
 
 
 # =====================
@@ -144,15 +143,6 @@ def parse_mask_timestamp(path):
     fname = os.path.basename(path).replace(".nc", "")
     return pd.Timestamp(fname)
 
-
-
-
-def get_mesh_latlon(splits=6):
-    meshes = icosahedral_mesh.get_hierarchy_of_triangular_meshes_for_sphere(
-        splits=splits
-    )
-    vertices = meshes[splits].vertices
-    return vertices_to_latlon(vertices)
 
 
 
