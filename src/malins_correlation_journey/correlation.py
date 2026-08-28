@@ -46,7 +46,6 @@ ERA5_MESH_BASE_DIR = Path(
 
 # PCA scores are sampled at these mesh nodes.
 NODE_HIERARCHY_LEVEL = 6
-FINE_MESH_LEVEL = 6
 MAX_PCS = 512
 
 # Include mesh position and cyclic clock fields as additional ERA5/context
@@ -201,7 +200,7 @@ def open_pca_sources(
 
 
 def mesh_dir_for_year(year: int) -> Path:
-    return ERA5_MESH_BASE_DIR / str(year) / f"mesh_l{FINE_MESH_LEVEL}"
+    return ERA5_MESH_BASE_DIR / str(year) / f"mesh_l{NODE_HIERARCHY_LEVEL}"
 
 
 def discover_time_series_features(year: int) -> dict[str, Path]:
@@ -425,9 +424,9 @@ def append_feature_results(
 
 
 def main() -> None:
-    selected_indices = get_coarse_mesh_node_indices( fine_splits=FINE_MESH_LEVEL, coarse_splits=NODE_HIERARCHY_LEVEL,)
+    selected_indices = get_coarse_mesh_node_indices( fine_splits=NODE_HIERARCHY_LEVEL, coarse_splits=NODE_HIERARCHY_LEVEL,)
 
-    vertices = get_mesh_vertices(splits=FINE_MESH_LEVEL,)
+    vertices = get_mesh_vertices(splits=NODE_HIERARCHY_LEVEL,)
 
     pca_sources, timestamps, n_pcs = open_pca_sources(
         selected_indices
