@@ -1,7 +1,0 @@
-2020 vs 2021 layer-8 PCA basis validation
-2020 shape: (400, 512)
-2021 shape: (400, 512)
-same_index_abs_mean: 0.450563
-best_match_abs_mean: 0.645924
-principal_angle_mean_cos: 0.983534
-principal_angle_min_cos: 0.170043
