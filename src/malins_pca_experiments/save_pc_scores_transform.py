@@ -6,7 +6,7 @@ import numpy as np
 
 ACTS_DIR = (
     "/share/prj-4d/graphcast_shared/data/"
-    "graphcast_activation_2021"
+    "graphcast_activation_2019"
 )
 
 PCA_COMPONENTS_PATH = (
@@ -24,13 +24,13 @@ PCA_MEAN_PATH = (
 OUT_PATH = (
     "/share/prj-4d/graphcast_shared/data/"
     "pc_scores_per_timestep/"
-    "pc_scores_2021_from_2019_2020_pca_per_timestep.npy"
+    "pc_scores_2019_from_2019_2020_pca_per_timestep.npy"
 )
 
 FILES_TXT_OUT = (
     "/share/prj-4d/graphcast_shared/data/"
     "pc_scores_per_timestep/"
-    "pc_scores_2021_from_2019_2020_pca_per_timestep_files.txt"
+    "pc_scores_2019_from_2019_2020_pca_per_timestep_files.txt"
 )
 
 N_COMPONENTS = 512

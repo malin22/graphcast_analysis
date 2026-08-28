@@ -14,13 +14,16 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
 from scipy.ndimage import label
 
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+
 
 # =====================
 # CONFIG
 # =====================
 
 WEATHER_FEATURE = "AR"
-THRESHOLD = 0.8
+THRESHOLD = 0.9
 CENTER_STR = "2021-02-12T18"
 NODE_HIERARCHY_LEVEL = 6
 
@@ -39,6 +42,7 @@ BASE_DIR = os.path.join(
     "pertubation_experiments",
     WEATHER_FEATURE,
     f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}",
+    f"PCA_200",
     f"pertubation_threshold_{THRESHOLD}",
     CENTER_STR,
 )
@@ -938,7 +942,14 @@ def plot_inside_outside_dose_response(
     print("Saved:", out_path)
 
 
-def plot_delta_map(delta_da, gamma, center_time, out_name, out_dir, lead_label=None):
+def plot_delta_map(
+    delta_da,
+    gamma,
+    center_time,
+    out_name,
+    out_dir,
+    lead_label=None,
+):
     lat_name = get_lat_name(delta_da)
     lon_name = get_lon_name(delta_da)
 
@@ -948,28 +959,79 @@ def plot_delta_map(delta_da, gamma, center_time, out_name, out_dir, lead_label=N
     if not np.isfinite(vmax) or vmax == 0:
         vmax = np.nanmax(np.abs(values))
 
-    plt.figure(figsize=(10, 4.8))
+    # Geographic plotting axis
+    fig, ax = plt.subplots(
+        figsize=(12, 5.5),
+        subplot_kw={"projection": ccrs.PlateCarree()},
+    )
 
+    # Plot ΔIVT
     delta_da.plot(
+        ax=ax,
         x=lon_name,
         y=lat_name,
+        transform=ccrs.PlateCarree(),
         cmap="RdBu_r",
         vmin=-vmax,
         vmax=vmax,
-        cbar_kwargs={"label": "ΔIVT"},
+        cbar_kwargs={
+            "label": "ΔIVT",
+            "shrink": 0.8,
+            "pad": 0.03,
+        },
     )
 
-    title = f"ΔIVT: gamma={gamma:+.2f} minus gamma=0, {center_time}"
+    # World-map boundaries on top of the ΔIVT field
+    ax.coastlines(
+        resolution="110m",
+        linewidth=0.8,
+        color="black",
+        zorder=10,
+    )
+
+    ax.add_feature(
+        cfeature.BORDERS,
+        linewidth=0.4,
+        edgecolor="black",
+        zorder=10,
+    )
+
+    # Show the whole world
+    ax.set_global()
+
+    # Longitude / latitude grid
+    gl = ax.gridlines(
+        crs=ccrs.PlateCarree(),
+        draw_labels=True,
+        linewidth=0.4,
+        linestyle="--",
+        alpha=0.4,
+        color="black",
+    )
+
+    gl.top_labels = False
+    gl.right_labels = False
+
+    title = f"ΔIVT: gamma={gamma:+.2f}"
+
     if lead_label is not None:
         title += f", {lead_label}"
-    plt.title(title)
+
+    ax.set_title(title)
+
     plt.tight_layout()
 
     out_path = os.path.join(out_dir, out_name)
-    plt.savefig(out_path, dpi=300, bbox_inches="tight")
-    plt.close()
-    print("Saved:", out_path)
 
+    plt.savefig(
+        out_path,
+        dpi=300,
+        bbox_inches="tight",
+    )
+
+    plt.close(fig)
+
+    print("Saved:", out_path)
 
 def plot_delta_wind10_map(delta_wind10, gamma, center_time, out_name, out_dir, lead_label=None):
     lat_name = get_lat_name(delta_wind10)
@@ -992,7 +1054,7 @@ def plot_delta_wind10_map(delta_wind10, gamma, center_time, out_name, out_dir, l
         cbar_kwargs={"label": "Δ10 m wind speed [m/s]"},
     )
 
-    title = f"Δ10 m wind: gamma={gamma:+.2f} minus gamma=0, {center_time}"
+    title = f"Δ10 m wind: gamma={gamma:+.2f}" #{center_time}"
     if lead_label is not None:
         title += f", {lead_label}"
 
@@ -1013,7 +1075,8 @@ def plot_ivt_map(ivt, gamma, center_time, out_name, out_dir):
         cbar_kwargs={"label": "IVT"}
     )
 
-    plt.title(f"IVT gamma={gamma:+.2f}, {center_time}")
+    plt.title(f"IVT gamma={gamma:+.2f}" #, {center_time}"
+    )
     plt.tight_layout()
 
     plt.savefig(os.path.join(out_dir, out_name), dpi=300)
@@ -1041,7 +1104,10 @@ def make_delta_ivt_video(center_time, gamma, control_file, perturbed_file):
     if not np.isfinite(vmax) or vmax == 0:
         vmax = np.nanmax(np.abs(delta.values))
 
-    fig, ax = plt.subplots(figsize=(10, 4.8))
+    fig, ax = plt.subplots(
+        figsize=(12, 5.5),
+        subplot_kw={"projection": ccrs.PlateCarree()},
+    )
 
     first = delta.isel(time=0)
     first.plot(
@@ -1056,25 +1122,61 @@ def make_delta_ivt_video(center_time, gamma, control_file, perturbed_file):
 
     def update(i):
         ax.clear()
+
         frame = delta.isel(time=i)
+
         frame.plot(
             ax=ax,
             x=lon_name,
             y=lat_name,
+            transform=ccrs.PlateCarree(),
             cmap="RdBu_r",
             vmin=-vmax,
             vmax=vmax,
             add_colorbar=False,
         )
 
+        ax.coastlines(
+            resolution="110m",
+            linewidth=0.7,
+            color="black",
+            zorder=20,
+        )
+
+        ax.add_feature(
+            cfeature.BORDERS,
+            linewidth=0.7,
+            edgecolor="black",
+            zorder=20,
+        )
+
+        ax.set_global()
+
+        # Longitude / latitude labels
+        gl = ax.gridlines(
+            crs=ccrs.PlateCarree(),
+            draw_labels=True,
+            linewidth=0.5,
+            linestyle="--",
+            alpha=0.4,
+        )
+
+        gl.top_labels = False
+        gl.right_labels = False
+        gl.xlabel_style = {"size": 9}
+        gl.ylabel_style = {"size": 9}
+
         lead_hours = int(
-            pd.to_timedelta(delta.time.values[i]).total_seconds() / 3600
+            pd.to_timedelta(
+                delta.time.values[i]
+            ).total_seconds() / 3600
         )
 
         ax.set_title(
             f"ΔIVT: gamma={gamma:+.2f}, "
             f"{center_time}, T+{format_lead_time(lead_hours)}"
         )
+
         return []
 
     anim = FuncAnimation(fig, update, frames=delta.sizes["time"], interval=500)

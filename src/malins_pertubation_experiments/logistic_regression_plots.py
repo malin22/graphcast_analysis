@@ -12,8 +12,8 @@ HIERARCHY_LEVEL = 6  # Node hierarchy level (1-6) for PCA scores
 
 BASE_PATH = f"plots/malins_experiments/logistic_regression/{WEATHER_FEATURE}/Node_Hierarchy_Level_M{HIERARCHY_LEVEL}"
 
-PCA_CSV = os.path.join(BASE_PATH, "PCA", f"logistic_probe_2020train_2021test_intersection_M{HIERARCHY_LEVEL}_max_3hour.csv")
-RAW_CSV = os.path.join(BASE_PATH, "raw_activations", f"logistic_probe_2020train_2021test_intersection_M{HIERARCHY_LEVEL}_max_3hour.csv")
+PCA_CSV = os.path.join(BASE_PATH, "PCA", f"logistic_probe_2020_2019_train_2021test_intersection_M{HIERARCHY_LEVEL}_max_3hour.csv")
+RAW_CSV = os.path.join(BASE_PATH, "raw_activations", f"logistic_probe_2020_2019_train_2021test_intersection_M{HIERARCHY_LEVEL}_max_3hour.csv")
 
 OUT_DIR = os.path.join(BASE_PATH, "figures")
 os.makedirs(OUT_DIR, exist_ok=True)
@@ -101,8 +101,8 @@ plot_metric(
 plot_metric(
     metric="test_f1",
     ylabel="F1 Score",
-    title=f"{WEATHER_FEATURE} F1 Score PCs vs Raw Activations \n"
-    f"Test set positive fraction: {positive_percent:.3f}%",
+    title=f"{WEATHER_FEATURE} F1 Score PCs vs Raw Activations \n",
+    #f"Test set positive fraction: {positive_percent:.3f}%",
     raw_value=raw_f1,
     out_name=f"{WEATHER_FEATURE.lower()}_f1_vs_pcs.png",
 )

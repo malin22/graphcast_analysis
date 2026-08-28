@@ -26,19 +26,21 @@ from graphcast import icosahedral_mesh
 # CONFIG
 # =====================
 
-WEATHER_FEATURE = "TC"  # "AR" or "TC"
-REPRESENTATION = "raw_activations"  # "raw_activations" or "PCA"
+WEATHER_FEATURE = "AR"  # "AR" or "TC"
+REPRESENTATION = "PCA"  # "raw_activations" or "PCA"
 NODE_HIERARCHY_LEVEL = 6
 
 FEATURE_COUNTS_RAW = [512]
-PC_COUNTS = [5, 10, 25, 50, 100, 200, 400]
+PC_COUNTS = [5, 10, 25, 50, 100, 200, 300, 400, 512]
 
 # Train/validation/test design:
 # - train probe on Jan-Oct 2020
 # - use Nov-Dec 2020 only for validation/model-selection diagnostics
 # - keep all of 2021 held out for final probe evaluation and later perturbation experiments
-TRAIN_START = pd.Timestamp("2020-01-01")
-TRAIN_END = pd.Timestamp("2021-01-01")
+TRAIN_START = pd.Timestamp("2019-01-01")
+TRAIN_END = pd.Timestamp("2020-11-01")
+VAL_START = pd.Timestamp("2020-11-01")
+VAL_END = pd.Timestamp("2021-01-01")
 TEST_START = pd.Timestamp("2021-01-01")
 TEST_END = pd.Timestamp("2022-01-01")
 
@@ -46,19 +48,22 @@ TEST_END = pd.Timestamp("2022-01-01")
 
 # Raw activation directories. Adjust these paths if your 2020 activations live elsewhere.
 ACTS_DIRS = {
+    2019: "/share/prj-4d/graphcast_shared/data/graphcast_activation_2019",
     2020: "/share/prj-4d/graphcast_shared/data/graphcast_activation_2020",
     2021: "/share/prj-4d/graphcast_shared/data/graphcast_activation_2021",
 }
 
 # PCA inputs, if REPRESENTATION == "PCA".
 PC_SCORES_PATHS = {
-    2020: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2020_per_timestep.npy",
-    2021: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2021_from_2020_pca_per_timestep.npy",
+    2019: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2019_from_2019_2020_pca_per_timestep.npy",
+    2020: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2020_from_2019_2020_pca_per_timestep.npy",
+    2021: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2021_from_2019_2020_pca_per_timestep.npy",
 }
 
 TIMESTEP_FILES_TXTS = {
-    2020: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2020_per_timestep_files.txt",
-    2021: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2021_from_2020_pca_per_timestep_files.txt",
+    2019: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2019_from_2019_2020_pca_per_timestep_files.txt",
+    2020: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2020_from_2019_2020_pca_per_timestep_files.txt",
+    2021: "/share/prj-4d/graphcast_shared/data/pc_scores_per_timestep/pc_scores_2021_from_2019_2020_pca_per_timestep_files.txt",
 }
 
 MASK_DIR = f"/share/prj-4d/graphcast_shared/data/ClimateNetLarge/{WEATHER_FEATURE}_labels_cleaned"
@@ -390,10 +395,6 @@ def build_graphcast_time_table(timestamps_by_year):
     return df
 
 
-def split_name_masks(time_index, valid):
-    train_mask = (time_index >= TRAIN_START) & (time_index < TRAIN_END) & valid
-    test_mask = (time_index >= TEST_START) & (time_index < TEST_END) & valid
-    return train_mask, test_mask
 
 
 def evaluate_split(model, X_split, y_split, split_name, threshold=0.5):
@@ -560,23 +561,42 @@ def main():
 
     matched_times = pd.to_datetime(matched_df["graphcast_time"].values)
 
-    event_train_mask = (matched_times >= TRAIN_START) & (matched_times < TRAIN_END)
-    event_test_mask = (matched_times >= TEST_START) & (matched_times < TEST_END)
+    event_train_mask = (
+        (matched_times >= TRAIN_START)
+        & (matched_times < TRAIN_END)
+    )
+
+    event_val_mask = (
+        (matched_times >= VAL_START)
+        & (matched_times < VAL_END)
+    )
+
+    event_test_mask = (
+        (matched_times >= TEST_START)
+        & (matched_times < TEST_END)
+    )
 
     train_mask = np.repeat(event_train_mask, samples_per_t)
+    val_mask = np.repeat(event_val_mask, samples_per_t)
     test_mask = np.repeat(event_test_mask, samples_per_t)
 
     y_train_all = y[train_mask]
+    y_val_all = y[val_mask]
     y_test_all = y[test_mask]
 
     print(f"Matched {WEATHER_FEATURE} files:", len(matched_df))
     print("y shape:", y.shape)
     print("Overall positive rate:", np.mean(y))
     print(f"Train window: {TRAIN_START.date()} to {TRAIN_END.date()} exclusive")
-    print(f"Held-out test window: {TEST_START.date()} to {TEST_END.date()} exclusive")
+    print(f"Validation window: {VAL_START.date()} to {VAL_END.date()} exclusive")
+    print(f"Test window: {TEST_START.date()} to {TEST_END.date()} exclusive")
+
     print("Train samples:", train_mask.sum())
+    print("Validation samples:", val_mask.sum())
     print("Test samples:", test_mask.sum())
+
     print("Train positives:", y_train_all.sum())
+    print("Validation positives:", y_val_all.sum())
     print("Test positives:", y_test_all.sum())
 
     results = []
@@ -592,6 +612,14 @@ def main():
             X_train = build_X_for_split(
                 matched_df,
                 event_train_mask,
+                pc_scores_by_year,
+                all_nodes,
+                n_features,
+            )
+
+            X_val = build_X_for_split(
+                matched_df,
+                event_val_mask,
                 pc_scores_by_year,
                 all_nodes,
                 n_features,
@@ -613,6 +641,13 @@ def main():
                 n_features,
             )
 
+            X_val = build_raw_X_for_split(
+                matched_df,
+                event_val_mask,
+                all_nodes,
+                n_features,
+            )
+
             X_test = build_raw_X_for_split(
                 matched_df,
                 event_test_mask,
@@ -620,13 +655,29 @@ def main():
                 n_features,
             )
         y_train = y_train_all
+        y_val = y_val_all
         y_test = y_test_all
 
-        valid_train = np.all(np.isfinite(X_train), axis=1) & np.isfinite(y_train)
-        valid_test = np.all(np.isfinite(X_test), axis=1) & np.isfinite(y_test)
+        valid_train = (
+            np.all(np.isfinite(X_train), axis=1)
+            & np.isfinite(y_train)
+        )
+
+        valid_val = (
+            np.all(np.isfinite(X_val), axis=1)
+            & np.isfinite(y_val)
+        )
+
+        valid_test = (
+            np.all(np.isfinite(X_test), axis=1)
+            & np.isfinite(y_test)
+        )
 
         X_train = X_train[valid_train]
         y_train = y_train[valid_train]
+
+        X_val = X_val[valid_val]
+        y_val = y_val[valid_val]
 
         X_test = X_test[valid_test]
         y_test = y_test[valid_test]
@@ -653,7 +704,42 @@ def main():
 
         model.fit(X_train, y_train)
 
-        direction_training_window = "2020_train_only"
+        y_val_prob = model.predict_proba(X_val)[:, 1]
+
+        val_metrics = {
+            "val_average_precision": average_precision_score(
+                y_val,
+                y_val_prob,
+            ),
+            "val_positive_rate": float(np.mean(y_val)),
+            "val_n_positive": int(np.sum(y_val)),
+            "val_n_total": int(len(y_val)),
+        }
+
+        if len(np.unique(y_val)) == 2:
+            val_metrics["val_roc_auc"] = roc_auc_score(
+                y_val,
+                y_val_prob,
+            )
+        else:
+            val_metrics["val_roc_auc"] = np.nan
+
+
+        val_best_f1 = metrics_at_best_f1_threshold(
+            y_true=y_val,
+            y_prob=y_val_prob,
+        )
+
+        selected_threshold = val_best_f1["best_threshold"]
+
+        val_metrics.update({
+            "val_best_threshold": selected_threshold,
+            "val_f1": val_best_f1["f1"],
+            "val_precision": val_best_f1["precision"],
+            "val_recall": val_best_f1["recall"],
+        })
+
+        direction_training_window = "2019_2020_train_only"
 
         scaler = model.named_steps["standardscaler"]
         clf = model.named_steps["logisticregression"]
@@ -678,6 +764,8 @@ def main():
             "direction_training_window": np.array([direction_training_window]),
             "train_start": np.array([str(TRAIN_START)]),
             "train_end": np.array([str(TRAIN_END)]),
+            "val_start": np.array([str(VAL_START)]),
+            "val_end": np.array([str(VAL_END)]),
             "test_start": np.array([str(TEST_START)]),
             "test_end": np.array([str(TEST_END)]),
             "direction_pc_delta": coef_z_unit,
@@ -700,27 +788,43 @@ def main():
         y_test_prob = model.predict_proba(X_test)[:, 1]
 
         test_metrics = {
-            "test_average_precision": average_precision_score(y_test, y_test_prob),
+            "test_average_precision": average_precision_score(
+                y_test,
+                y_test_prob,
+            ),
             "test_positive_rate": float(np.mean(y_test)),
             "test_n_positive": int(np.sum(y_test)),
             "test_n_total": int(len(y_test)),
         }
 
         if len(np.unique(y_test)) == 2:
-            test_metrics["test_roc_auc"] = roc_auc_score(y_test, y_test_prob)
+            test_metrics["test_roc_auc"] = roc_auc_score(
+                y_test,
+                y_test_prob,
+            )
         else:
             test_metrics["test_roc_auc"] = np.nan
 
-        best_f1_metrics = metrics_at_best_f1_threshold(
-            y_true=y_test,
-            y_prob=y_test_prob,
-        )
+        # Apply threshold selected on validation
+        y_test_pred = y_test_prob >= selected_threshold
 
         test_metrics.update({
-            "test_best_threshold": best_f1_metrics["best_threshold"],
-            "test_f1": best_f1_metrics["f1"],
-            "test_precision": best_f1_metrics["precision"],
-            "test_recall": best_f1_metrics["recall"],
+            "test_threshold": selected_threshold,
+            "test_f1": f1_score(
+                y_test,
+                y_test_pred,
+                zero_division=0,
+            ),
+            "test_precision": precision_score(
+                y_test,
+                y_test_pred,
+                zero_division=0,
+            ),
+            "test_recall": recall_score(
+                y_test,
+                y_test_pred,
+                zero_division=0,
+            ),
         })
         
 
@@ -771,12 +875,14 @@ def main():
             "model": "logistic_l2_balanced",
             "direction_training_window": direction_training_window,
             "n_train": int(len(y_train)),
+            "n_val": int(len(y_val)),
             "n_test": int(len(y_test)),
             "train_positive_rate": float(np.mean(y_train)),
             "test_positive_rate": float(np.mean(y_test)),
         }
 
         row.update(test_metrics)
+        row.update(val_metrics)
         results.append(row)
 
         print(
@@ -784,18 +890,18 @@ def main():
             f"TEST AP={test_metrics['test_average_precision']:.3f} | "
             f"TEST AUC={test_metrics['test_roc_auc']:.3f} | "
             f"BEST TEST F1={test_metrics['test_f1']:.3f} | "
-            f"threshold={test_metrics['test_best_threshold']:.6f} | "
+            f"threshold={test_metrics['test_threshold']:.6f} | "
             f"P={test_metrics['test_precision']:.3f} | "
             f"R={test_metrics['test_recall']:.3f}"
         )
 
-        del X_train, X_test
+        del X_train, X_test, X_val
 
     df = pd.DataFrame(results)
 
     out_csv = os.path.join(
         OUT_DIR,
-        f"logistic_probe_2020train_2021test_{LABEL_MODE}_M{NODE_HIERARCHY_LEVEL}_max_{MAX_TIME_DIFFERENCE_HOURS}hour.csv",
+        f"logistic_probe_2020_2019_train_2021test_{LABEL_MODE}_M{NODE_HIERARCHY_LEVEL}_max_{MAX_TIME_DIFFERENCE_HOURS}hour.csv",
     )
 
     df.to_csv(out_csv, index=False)

@@ -23,8 +23,8 @@ from graphcast import icosahedral_mesh
 # CONFIG
 # =====================
 
-WEATHER_FEATURE = "AR"      # "TC" or "AR"
-REPRESENTATION = "raw_activations"
+WEATHER_FEATURE = "TC"      # "TC" or "AR"
+REPRESENTATION = "PCA"
 NODE_HIERARCHY_LEVEL = 6
 N_FEATURES = 512
 
@@ -43,7 +43,9 @@ MASK_DIR = (
 
 MODEL_PATH = (
     f"plots/malins_experiments/logistic_regression/"
-    f"{WEATHER_FEATURE}/{REPRESENTATION}/"
+    f"{WEATHER_FEATURE}/"
+    f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}/"
+    f"{REPRESENTATION}/"
     f"logistic_probe_model_{WEATHER_FEATURE}_{REPRESENTATION}_"
     f"{LABEL_MODE}_M{NODE_HIERARCHY_LEVEL}_{N_FEATURES}_features_"
     f"2020_train_only.joblib"
@@ -51,7 +53,9 @@ MODEL_PATH = (
 
 OUT_DIR = (
     f"plots/malins_experiments/logistic_regression/"
-    f"{WEATHER_FEATURE}/{REPRESENTATION}/evaluation"
+    f"{WEATHER_FEATURE}/"
+    f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}/"
+    f"evaluation"
 )
 os.makedirs(OUT_DIR, exist_ok=True)
 

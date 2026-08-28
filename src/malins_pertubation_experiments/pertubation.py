@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 import numpy as np
 import xarray as xr
+import joblib
 
 import pandas as pd
 
@@ -57,12 +58,18 @@ print("GraphCast signature:", inspect.signature(graphcast.GraphCast))
 GAMMA = [-1.0, -0.5, -0.2, 0.0, 0.2, 0.5, 1.0]
 
 WEATHER_FEATURE = "AR"
+
+REPRESENTATION = "PCA"   # "raw_activations" or "PCA"
+N_PCS = 200                          # only used when REPRESENTATION == "PCA"
+
+
 START_TIME = "2021-02-12T18"
 
 N_DAYS = 5
 
 THRESHOLD = 0.9
 NODE_HIERARCHY_LEVEL = 6
+
 
 
 def round_to_nearest_6h(t):
@@ -74,23 +81,90 @@ def round_to_nearest_6h(t):
 
     return pd.Timestamp(t.date()) + pd.Timedelta(hours=hour)
 
-
-PROBE_DIRECTION_PATH = (
-    f"/home/student/m/mbraatz/share/graphcast_analysis/plots/malins_experiments/logistic_regression/{WEATHER_FEATURE}/raw_activations/probe_direction_{WEATHER_FEATURE}_raw_activations_intersection_M{NODE_HIERARCHY_LEVEL}_512_features_2020_train_only.npz"
-)
-
-direction = np.load(PROBE_DIRECTION_PATH)["direction_raw_delta"].astype(np.float32)
-
 center = round_to_nearest_6h(START_TIME)
 centers = [np.datetime64(center)]
 
+PROBE_BASE_DIR = (
+    f"/home/student/m/mbraatz/share/graphcast_analysis/"
+    f"plots/malins_experiments/logistic_regression/"
+    f"{WEATHER_FEATURE}/Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}"
+)
+pca_components = None
+pca_mean = None
+
+if REPRESENTATION == "raw_activations":
+
+    N_FEATURES = 512
+
+    PROBE_DIRECTION_PATH = (
+        f"{PROBE_BASE_DIR}/raw_activations/"
+        f"probe_direction_{WEATHER_FEATURE}_raw_activations_"
+        f"intersection_M{NODE_HIERARCHY_LEVEL}_{N_FEATURES}_features_"
+        f"2019_2020_train_only.npz"
+    )
+
+elif REPRESENTATION == "PCA":
+
+    N_FEATURES = N_PCS
+
+    PROBE_DIRECTION_PATH = (
+        f"{PROBE_BASE_DIR}/PCA/"
+        f"probe_direction_{WEATHER_FEATURE}_PCA_"
+        f"intersection_M{NODE_HIERARCHY_LEVEL}_{N_PCS}_features_"
+        f"2019_2020_train_only.npz"
+    )
+
+else:
+    raise ValueError(f"Unknown REPRESENTATION: {REPRESENTATION}")
+
+
+print("Using representation:", REPRESENTATION)
+print("Using probe:", PROBE_DIRECTION_PATH)
+
 probe = np.load(PROBE_DIRECTION_PATH)
 
-direction = probe["direction_raw_delta"].astype(np.float32)
 scaler_mean = probe["scaler_mean"].astype(np.float32)
 scaler_scale = probe["scaler_scale"].astype(np.float32)
 coef_z = probe["coef_z"].astype(np.float32)
 intercept = probe["intercept"].astype(np.float32)
+
+
+if REPRESENTATION == "raw_activations":
+
+    direction = probe["coef_z_unit"].astype(np.float32)
+
+
+elif REPRESENTATION == "PCA":
+
+    PCA_COMPONENTS_PATH = (
+        "/share/prj-4d/graphcast_shared/data/"
+        "pca_components/512_PCs/layer8_only/"
+        "pca_components_2019_2020_layer8.npy"
+    )
+
+    PCA_MEAN_PATH = (
+        "/share/prj-4d/graphcast_shared/data/"
+        "pca_components/512_PCs/layer8_only/"
+        "pca_mean_2019_2020_layer8.npy"
+    )
+
+    all_pca_components = np.load(PCA_COMPONENTS_PATH).astype(np.float32)
+    pca_mean = np.load(PCA_MEAN_PATH).astype(np.float32)
+
+    # Only use the first N_PCS
+    pca_components = all_pca_components[:N_PCS]
+    # logistic direction in ordinary PC-score coordinates
+    direction_pc = coef_z / scaler_scale
+
+    # Map PC direction back into the 512-D GraphCast activation space
+    direction = pca_components.T @ direction_pc
+    direction = direction.astype(np.float32)
+
+    # Normalize injected raw-space direction
+    direction /= np.linalg.norm(direction) + 1e-8
+
+
+print("Final perturbation direction shape:", direction.shape)
 
 #Authenticate with google Cloud Storage (to Access Graphcast storage)
 gcs_client = storage.Client.create_anonymous_client()
@@ -277,9 +351,23 @@ def construct_wrapped_graphcast(model_config, task_config, gamma):
         scaler_scale=scaler_scale,
         coef_z=coef_z,
         intercept=intercept,
-        threshold=THRESHOLD,   # or None for soft weighting everywhere
-        gamma = gamma
+        threshold=THRESHOLD,
+        gamma=gamma,
+
+        representation=REPRESENTATION,
+        pca_components=pca_components,
+        pca_mean=pca_mean,
     )
+
+    print("REPRESENTATION:", REPRESENTATION)
+    print("direction:", direction.shape)
+    print("coef_z:", coef_z.shape)
+    print("scaler_mean:", scaler_mean.shape)
+    print("scaler_scale:", scaler_scale.shape)
+
+    if REPRESENTATION == "PCA":
+        print("pca_components:", pca_components.shape)
+        print("pca_mean:", pca_mean.shape)
 
     predictor = graphcast.GraphCast(
         model_config,
@@ -391,16 +479,23 @@ for gamma in GAMMA:
             forcings=forcings,
         )
 
+
+        
+        if REPRESENTATION == "PCA":
+            representation_dir = f"PCA_{N_PCS}"
+        else:
+            representation_dir = "raw_activations"
+
         out_dir = os.path.join(
             "plots",
             "malins_experiments",
             "pertubation_experiments",
             WEATHER_FEATURE,
             f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}",
+            representation_dir,
             f"pertubation_threshold_{THRESHOLD}",
-            center_str,         
+            center_str,
             "data",
-            
         )
 
         os.makedirs(out_dir, exist_ok=True)

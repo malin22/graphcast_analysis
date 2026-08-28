@@ -7,7 +7,7 @@ import pandas as pd
 
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import Ridge, Lasso
+from sklearn.linear_model import Ridge, Lasso, LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error
 
 from graphcast import icosahedral_mesh
@@ -17,18 +17,23 @@ from graphcast import icosahedral_mesh
 # CONFIG
 # =====================
 
-YEARS = [2020, 2021]
+YEARS = [2019, 2020, 2021]
 
 PC_SCORES_PATHS = [
     (
         "/share/prj-4d/graphcast_shared/data/"
         "pc_scores_per_timestep/"
-        "pc_scores_2020_per_timestep.npy"
+        "pc_scores_2019_from_2019_2020_pca_per_timestep.npy"
     ),
     (
         "/share/prj-4d/graphcast_shared/data/"
         "pc_scores_per_timestep/"
-        "pc_scores_2021_from_2020_pca_per_timestep.npy"
+        "pc_scores_2020_from_2019_2020_pca_per_timestep.npy"
+    ),
+    (
+        "/share/prj-4d/graphcast_shared/data/"
+        "pc_scores_per_timestep/"
+        "pc_scores_2021_from_2019_2020_pca_per_timestep.npy"
     ),
 ]
 
@@ -36,12 +41,17 @@ TIMESTEP_FILES_TXTS = [
     (
         "/share/prj-4d/graphcast_shared/data/"
         "pc_scores_per_timestep/"
-        "pc_scores_2020_per_timestep_files.txt"
+        "pc_scores_2019_from_2019_2020_pca_per_timestep_files.txt"
     ),
     (
         "/share/prj-4d/graphcast_shared/data/"
         "pc_scores_per_timestep/"
-        "pc_scores_2021_from_2020_pca_per_timestep_files.txt"
+        "pc_scores_2020_from_2019_2020_pca_per_timestep_files.txt"
+    ),
+    (
+        "/share/prj-4d/graphcast_shared/data/"
+        "pc_scores_per_timestep/"
+        "pc_scores_2021_from_2019_2020_pca_per_timestep_files.txt"
     ),
 ]
 
@@ -54,14 +64,14 @@ ERA5_MESH_BASE_DIR = "/share/prj-4d/graphcast_shared/data/era5_daily_mesh"
 
 node_hierarchy_level = 5
 
-PC_COUNTS = [5, 10, 25, 50, 100, 200, 400]
-MAX_PCA = 400
+PC_COUNTS = [5, 10, 25, 50, 100, 200, 400, 512]
+MAX_PCA = 512
 
-regression_type = "ridge"      # "ridge" or "lasso"
+regression_type = "linear"   # "linear", "ridge", or "lasso"
 score_values = "PCA"           # "PCA" or "raw_activations"
 
 OUT_DIR = (
-    f"plots/malins_experiments/2020_2021_regression/"
+    f"plots/malins_experiments/regression_test_2021_train_2019_2020/"
     f"{score_values}/{regression_type}/l{node_hierarchy_level}_nodes"
 )
 os.makedirs(OUT_DIR, exist_ok=True)
@@ -260,7 +270,7 @@ def corr(a, b):
     return np.corrcoef(a[mask], b[mask])[0, 1]
 
 def load_pca_features(all_nodes, samples_per_t):
-    if regression_type == "ridge":
+    if regression_type in ["ridge", "linear"]:
         max_needed = max(PC_COUNTS)
         feature_counts = PC_COUNTS
     elif regression_type == "lasso":
@@ -333,6 +343,418 @@ def load_raw_activation_features(all_nodes, samples_per_t):
 
     return X, pd.DatetimeIndex(timestamps), feature_counts
 
+def iter_pca_target_chunks(
+    target,
+    all_nodes,
+    n_features,
+    years,
+    chunk_timesteps=1,
+):
+    for pc_path, txt_path in zip(
+        PC_SCORES_PATHS,
+        TIMESTEP_FILES_TXTS,
+    ):
+        _, timestamps = load_timestamps(txt_path)
+        timestamps = pd.DatetimeIndex(timestamps)
+
+        file_year = timestamps[0].year
+
+        if file_year not in years:
+            continue
+
+        print(f"Streaming year {file_year}")
+
+        # PCA scores stay memory-mapped
+        pcs = np.load(
+            pc_path,
+            mmap_mode="r",
+        )
+
+        era5_mesh_dir = os.path.join(
+            ERA5_MESH_BASE_DIR,
+            str(file_year),
+            "mesh_l6",
+        )
+
+        era5_mesh_ts_dir = os.path.join(
+            era5_mesh_dir,
+            "time_series",
+        )
+
+        era5_mesh_time_values = os.path.join(
+            era5_mesh_dir,
+            "time_values.npy",
+        )
+
+        if not os.path.exists(era5_mesh_time_values):
+            raise FileNotFoundError(
+                f"Missing ERA5 time values: {era5_mesh_time_values}"
+            )
+
+        mesh_times = pd.to_datetime(
+            np.load(
+                era5_mesh_time_values,
+                allow_pickle=True,
+            )
+        )
+
+        target_path = os.path.join(
+            era5_mesh_ts_dir,
+            mesh_target_filename(target),
+        )
+
+        if not os.path.exists(target_path):
+            raise FileNotFoundError(
+                f"Missing ERA5 target file: {target_path}"
+            )
+
+        y_memmap = np.load(
+            target_path,
+            mmap_mode="r",
+        )
+
+        time_to_idx = {
+            pd.Timestamp(t): i
+            for i, t in enumerate(mesh_times)
+        }
+
+        valid_time_mask = np.array([
+            pd.Timestamp(t) in time_to_idx
+            for t in timestamps
+        ])
+
+        if not np.all(valid_time_mask):
+            missing = timestamps[~valid_time_mask]
+
+            print(
+                f"Warning: {len(missing)} PCA timestamps are missing "
+                f"from ERA5 for {file_year}"
+            )
+
+            print(
+                "First missing timestamps:",
+                list(missing[:10]),
+            )
+
+        timestamps = timestamps[valid_time_mask]
+
+        pca_time_indices = np.nonzero(valid_time_mask)[0]
+
+        target_indices = np.array([
+            time_to_idx[pd.Timestamp(t)]
+            for t in timestamps
+        ])
+
+        T = len(timestamps)
+        for start in range(0, T, chunk_timesteps):
+            stop = min(start + chunk_timesteps, T)
+
+            # PCA indices corresponding to the valid timestamps
+            pca_idx = pca_time_indices[start:stop]
+
+            if node_hierarchy_level == 6:
+                X_chunk = np.asarray(
+                    pcs[
+                        pca_idx,
+                        :,
+                        :n_features,
+                    ],
+                    dtype=np.float32,
+                )
+
+                y_chunk = np.asarray(
+                    y_memmap[
+                        target_indices[start:stop],
+                        :
+                    ],
+                    dtype=np.float32,
+                )
+
+            else:
+                X_chunk = np.asarray(
+                    pcs[
+                        pca_idx,
+                        all_nodes,
+                        :n_features,
+                    ],
+                    dtype=np.float32,
+                )
+
+                y_chunk = np.asarray(
+                    y_memmap[
+                        target_indices[start:stop]
+                    ][:, all_nodes],
+                    dtype=np.float32,
+                )
+            X_chunk = X_chunk.reshape(
+                -1,
+                n_features,
+            )
+
+            y_chunk = y_chunk.reshape(-1)
+
+            valid = (
+                np.all(
+                    np.isfinite(X_chunk),
+                    axis=1,
+                )
+                &
+                np.isfinite(y_chunk)
+            )
+
+            yield (
+                X_chunk[valid],
+                y_chunk[valid],
+            )
+def fit_streaming_regression(
+    target,
+    all_nodes,
+    n_features,
+    regression_type,
+    alpha=1.0,
+):
+    XtX = np.zeros(
+        (n_features, n_features),
+        dtype=np.float64,
+    )
+
+    Xty = np.zeros(
+        n_features,
+        dtype=np.float64,
+    )
+
+    sum_x = np.zeros(
+        n_features,
+        dtype=np.float64,
+    )
+
+    sum_x2 = np.zeros(
+        n_features,
+        dtype=np.float64,
+    )
+
+    sum_y = 0.0
+    n = 0
+
+    for X_chunk, y_chunk in iter_pca_target_chunks(
+        target=target,
+        all_nodes=all_nodes,
+        n_features=n_features,
+        years=[2019, 2020],
+        chunk_timesteps=1,
+    ):
+        # Accumulate in float64
+        X64 = X_chunk.astype(
+            np.float64,
+            copy=False,
+        )
+
+        y64 = y_chunk.astype(
+            np.float64,
+            copy=False,
+        )
+
+        XtX += X64.T @ X64
+        Xty += X64.T @ y64
+
+        sum_x += X64.sum(axis=0)
+        sum_x2 += np.sum(
+            X64 * X64,
+            axis=0,
+        )
+
+        sum_y += y64.sum()
+        n += len(y64)
+
+        del X_chunk
+        del y_chunk
+        del X64
+        del y64
+
+    if n == 0:
+        raise RuntimeError(
+            f"No valid training samples for {target['name']}"
+        )
+
+    mean_x = sum_x / n
+    mean_y = sum_y / n
+
+    XtX_centered = (
+        XtX
+        - n * np.outer(
+            mean_x,
+            mean_x,
+        )
+    )
+
+    Xty_centered = (
+        Xty
+        - n * mean_x * mean_y
+    )
+
+    if regression_type == "linear":
+        coef = np.linalg.solve(
+            XtX_centered,
+            Xty_centered,
+        )
+
+    elif regression_type == "ridge":
+        var_x = (
+            sum_x2 / n
+            - mean_x ** 2
+        )
+
+        scale_x = np.sqrt(
+            np.maximum(
+                var_x,
+                0.0,
+            )
+        )
+
+        scale_x[scale_x == 0] = 1.0
+
+        XtX_scaled = (
+            XtX_centered
+            / scale_x[:, None]
+            / scale_x[None, :]
+        )
+
+        Xty_scaled = (
+            Xty_centered
+            / scale_x
+        )
+
+        A = (
+            XtX_scaled
+            + alpha * np.eye(
+                n_features,
+                dtype=np.float64,
+            )
+        )
+
+        coef_scaled = np.linalg.solve(
+            A,
+            Xty_scaled,
+        )
+
+        coef = (
+            coef_scaled
+            / scale_x
+        )
+
+    else:
+        raise ValueError(
+            f"Streaming regression supports only "
+            f"'linear' and 'ridge', got {regression_type}"
+        )
+
+    intercept = (
+        mean_y
+        - mean_x @ coef
+    )
+
+    return coef, intercept, n
+
+
+def evaluate_streaming_regression(
+    target,
+    all_nodes,
+    n_features,
+    coef,
+    intercept,
+):
+    n = 0
+
+    sum_y = 0.0
+    sum_pred = 0.0
+
+    sum_y2 = 0.0
+    sum_pred2 = 0.0
+    sum_ypred = 0.0
+
+    sse = 0.0
+
+    for X_chunk, y_chunk in iter_pca_target_chunks(
+        target=target,
+        all_nodes=all_nodes,
+        n_features=n_features,
+        years=[2021],
+        chunk_timesteps=1,
+    ):
+        pred = (
+            X_chunk @ coef
+            + intercept
+        )
+
+        diff = y_chunk - pred
+
+        sse += np.sum(
+            diff * diff
+        )
+
+        sum_y += np.sum(y_chunk)
+        sum_pred += np.sum(pred)
+
+        sum_y2 += np.sum(
+            y_chunk * y_chunk
+        )
+
+        sum_pred2 += np.sum(
+            pred * pred
+        )
+
+        sum_ypred += np.sum(
+            y_chunk * pred
+        )
+
+        n += len(y_chunk)
+
+        del X_chunk
+        del y_chunk
+        del pred
+        del diff
+
+    if n == 0:
+        raise RuntimeError(
+            f"No valid test samples for {target['name']}"
+        )
+
+    sst = (
+        sum_y2
+        - sum_y ** 2 / n
+    )
+
+    r2 = 1.0 - sse / sst
+
+    rmse = np.sqrt(
+        sse / n
+    )
+
+    corr_num = (
+        sum_ypred
+        - sum_y * sum_pred / n
+    )
+
+    corr_den = np.sqrt(
+        (
+            sum_y2
+            - sum_y ** 2 / n
+        )
+        *
+        (
+            sum_pred2
+            - sum_pred ** 2 / n
+        )
+    )
+
+    corr_test = corr_num / corr_den
+
+    return (
+        r2,
+        rmse,
+        corr_test,
+        n,
+    )
 
 # =====================
 # MAIN
@@ -352,134 +774,91 @@ def main():
     print("Nodes per timestep:", samples_per_t)
     print(f"Using M{node_hierarchy_level} coarse mesh nodes: {samples_per_t}")
 
-    if score_values == "PCA":
-        X, timestamps, feature_counts = load_pca_features(
-            all_nodes,
-            samples_per_t,
+    if score_values != "PCA":
+        raise NotImplementedError(
+            "Streaming implementation currently supports PCA only."
         )
-
-    elif score_values == "raw_activations":
-        X, timestamps, feature_counts = load_raw_activation_features(
-            all_nodes,
-            samples_per_t,
-        )
-
-    else:
-        raise ValueError(f"Wrong score_values: {score_values}")
-
-    time_index = np.repeat(timestamps.values, samples_per_t)
-    time_index = pd.to_datetime(time_index)
-
-    train_mask = (
-        (time_index >= "2020-01-01") &
-        (time_index < "2021-01-01")
-    )
-
-    test_mask = (
-        (time_index >= "2021-01-01") &
-        (time_index < "2022-01-01")
-    )
-
-    print("X shape:", X.shape)
-    print("Train samples:", train_mask.sum())
-    print("Test samples:", test_mask.sum())
 
     print(
-        f"Running {regression_type} regression with {score_values} "
+        f"Running streaming {regression_type} regression with PCA "
         f"to predict {len(TARGETS)} targets"
     )
-
-    valid_X = np.all(np.isfinite(X), axis=1)
-
-
-    y_by_target = {}
-
-    for target in TARGETS:
-        print(f"Loading target: {target['name']}")
-        y_by_target[target["name"]] = load_mesh_target(
-            target,
-            timestamps=timestamps,
-            node_indices=all_nodes,
-        )
 
     results = []
 
     for target in TARGETS:
         print(f"\nTarget: {target['name']}")
 
-        y = y_by_target[target["name"]]
-        valid = np.isfinite(y) & valid_X
+        for n_features in PC_COUNTS:
 
-        valid_train = valid & train_mask
-        valid_test = valid & test_mask
+            if regression_type == "linear":
+                alpha = 0.0
 
-
-        for n_features in feature_counts:
-            X_train = X[valid_train, :n_features]
-            X_test = X[valid_test, :n_features]
-
-            y_train = y[valid_train]
-            y_test = y[valid_test]
-
-            if regression_type == "ridge":
-                regs = [
-                    ("ridge", Ridge(alpha=1.0), 1.0)
-                ]
-
-            elif regression_type == "lasso":
-                regs = [
-                    (f"lasso_alpha_{alpha}", Lasso(alpha=alpha, max_iter=3000), alpha)
-                    for alpha in [0.01, 0.03, 0.1, 0.3, 0.5, 0.7, 1.0]
-                ]
+            elif regression_type == "ridge":
+                alpha = 1.0
 
             else:
-                raise ValueError(f"Unknown regression_type: {regression_type}")
-
-            for reg_name, reg, alpha in regs:
-                model = make_pipeline(
-                    StandardScaler(),
-                    reg,
+                raise ValueError(
+                    f"Streaming version currently supports "
+                    f"'linear' and 'ridge', got {regression_type}"
                 )
 
-                model.fit(X_train, y_train)
-                y_test_pred = model.predict(X_test)
+            print(
+                f"Fitting {target['name']} "
+                f"with {n_features} PCs"
+            )
 
-                fitted_reg = model.named_steps[
-                    reg.__class__.__name__.lower()
-                ]
-
-                n_selected = np.sum(fitted_reg.coef_ != 0)
-
-                r2_test = r2_score(y_test, y_test_pred)
-                rmse_test = np.sqrt(mean_squared_error(y_test, y_test_pred))
-                corr_test = corr(y_test, y_test_pred)
-
-                results.append({
-                    "target": target["name"],
-                    "n_features": n_features,
-                    "alpha": alpha,
-                    "r2_test": r2_test,
-                    "rmse_test": rmse_test,
-                    "corr_test": corr_test,
-                    "n_train": len(y_train),
-                    "n_test": len(y_test),
-                    "n_selected": int(n_selected),
-                })
-
-                print(
-                    f"{target['name']:>6s} | features={n_features:>3d} | "
-                    f"alpha={alpha:.4g} | "
-                    f"test R2={r2_test:.3f} | "
-                    f"test r={corr_test:.3f} | "
-                    f"test RMSE={rmse_test:.3f} | "
-                    f"selected={n_selected:>3d}"
+            coef, intercept, n_train = (
+                fit_streaming_regression(
+                    target=target,
+                    all_nodes=all_nodes,
+                    n_features=n_features,
+                    regression_type=regression_type,
+                    alpha=alpha,
                 )
+            )
+
+            (
+                r2_test,
+                rmse_test,
+                corr_test,
+                n_test,
+            ) = evaluate_streaming_regression(
+                target=target,
+                all_nodes=all_nodes,
+                n_features=n_features,
+                coef=coef,
+                intercept=intercept,
+            )
+
+            results.append({
+                "target": target["name"],
+                "n_features": n_features,
+                "alpha": alpha,
+                "r2_test": r2_test,
+                "rmse_test": rmse_test,
+                "corr_test": corr_test,
+                "n_train": n_train,
+                "n_test": n_test,
+                "n_selected": n_features,
+            })
+
+            print(
+                f"{target['name']:>6s} | "
+                f"features={n_features:>3d} | "
+                f"alpha={alpha:.4g} | "
+                f"test R2={r2_test:.3f} | "
+                f"test r={corr_test:.3f} | "
+                f"test RMSE={rmse_test:.3f}"
+            )
+
+            del coef
 
     df = pd.DataFrame(results)
 
     out_csv = os.path.join(
         OUT_DIR,
-        "pc_regression_physical_variables_2020train_2021test.csv",
+        "pc_regression_physical_variables_2019_2020train_2021test.csv",
     )
 
     df.to_csv(out_csv, index=False)

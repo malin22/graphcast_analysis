@@ -12,8 +12,6 @@ from graphcast import icosahedral_mesh
 # CONFIG
 # =====================
 
-YEARS = [2020, 2021]
-
 PC_SCORES_PATHS = [
     (
         "/share/prj-4d/graphcast_shared/data/"
@@ -57,7 +55,7 @@ STATIC_DIR_NAMES = ("static_fields", "static")
 
 OUT_DIR = Path(
     "plots/malins_experiments/2021_correlation_on_2020_19/"
-    f"PCA_matrix_multiply/l{NODE_HIERARCHY_LEVEL}_nodes"
+    f"PCA/l{NODE_HIERARCHY_LEVEL}_nodes"
 )
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 

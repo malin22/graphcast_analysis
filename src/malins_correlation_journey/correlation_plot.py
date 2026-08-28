@@ -7,6 +7,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import os
 
 
 """
@@ -70,24 +71,25 @@ Score modes
 # =====================
 
 CORRELATION_CSV = Path(
-    "plots/malins_experiments/2021_correlation/"
-    "PCA_matrix_multiply/l6_nodes/"
+    "plots/malins_experiments/2021_correlation_on_2020_19/"
+    "PCA/l6_nodes/"
     "all_era5_context_pc_correlations_long.csv"
 )
 
 OUT_DIR = Path(
-    "plots/malins_experiments/2021_correlation/"
-    "PCA_matrix_multiply/l6_nodes/"
+    "plots/malins_experiments/2021_correlation_on_2020_19/"
+    "PCA/l6_nodes/"
     "correlation_plots"
 )
 
-PCS = list(range(1, 21))          # e.g. None or ["PC_1", "PC_2", ..., "PC_20"]
-AGGREGATION = "max"
+PCS = list(range(1, 513))          # e.g. None or ["PC_1", "PC_2", ..., "PC_20"]
+AGGREGATION = "mean"
 SCORE_MODE = "abs"  # "abs" or "signed" (correlation values)
 
 ADD_SMOOTH = False # smooth curve added
 
-PER_PC = True
+PER_PC = False
+PER_VARIABLE = True
 PER_PC_LAYOUT = "grid"   # "grid", "separate", "both"
 PER_PC_GRID_COLS = 5
 
@@ -1409,6 +1411,270 @@ def plot_per_pc_separate(
         )
 
 
+
+def plot_feature_group_grid(
+    scores_by_pc,
+    pcs,
+    feature_base,
+    feature_label,
+    output_dir,
+    score_mode,
+    ncols=4,
+):
+    """
+    One figure for one atmospheric feature group.
+
+    Example:
+        Temperature
+
+    Each subplot corresponds to one pressure level.
+    Within each subplot:
+        x-axis = PCs
+        y-axis = correlation
+    """
+
+    # ----------------------------------------------------------
+    # Find all pressure-level features belonging to this group
+    # ----------------------------------------------------------
+
+    feature_levels = []
+
+    for feature in {
+        feature
+        for pc in pcs
+        for feature in scores_by_pc.get(pc, {})
+    }:
+
+        match = re.fullmatch(
+            rf"{re.escape(feature_base)}_lev(\d+)",
+            feature,
+        )
+
+        if not match:
+            continue
+
+        lev_idx = int(match.group(1))
+        hpa = lev_to_hpa(lev_idx)
+
+        if hpa not in KEEP_PRESSURE_LEVELS_HPA:
+            continue
+
+        feature_levels.append(
+            (hpa, feature)
+        )
+
+    if not feature_levels:
+        print(f"No features found for {feature_label}")
+        return
+
+    # Sort from upper atmosphere to surface
+    feature_levels.sort(
+        key=lambda item: item[0]
+    )
+
+    # ----------------------------------------------------------
+    # Layout
+    # ----------------------------------------------------------
+
+    n_features = len(feature_levels)
+
+    nrows = int(
+        np.ceil(n_features / ncols)
+    )
+
+    fig, axes = plt.subplots(
+        nrows=nrows,
+        ncols=ncols,
+        figsize=(
+            4.5 * ncols,
+            3.5 * nrows,
+        ),
+        sharex=True,
+        sharey=True,
+    )
+
+    axes = np.asarray(
+        axes
+    ).reshape(-1)
+
+    pc_numbers = np.asarray(
+        [pc_sort_key(pc) for pc in pcs]
+    )
+
+    # ----------------------------------------------------------
+    # Determine common y-axis
+    # ----------------------------------------------------------
+
+    all_values = []
+
+    for hpa, feature in feature_levels:
+
+        for pc in pcs:
+
+            value = scores_by_pc.get(
+                pc, {}
+            ).get(
+                feature, np.nan
+            )
+
+            if np.isfinite(value):
+                all_values.append(value)
+
+    all_values = np.asarray(
+        all_values,
+        dtype=np.float64,
+    )
+
+    if all_values.size == 0:
+        print(f"No valid values for {feature_label}")
+        plt.close(fig)
+        return
+
+    extent = np.nanmax(
+        np.abs(all_values)
+    )
+
+    limit = min(
+        1.0,
+        extent * 1.15,
+    )
+
+    # ----------------------------------------------------------
+    # Plot pressure levels
+    # ----------------------------------------------------------
+
+    for axis_index, ax in enumerate(axes):
+
+        if axis_index >= n_features:
+            ax.axis("off")
+            continue
+
+        hpa, feature = feature_levels[axis_index]
+
+        values = np.asarray(
+            [
+                scores_by_pc.get(
+                    pc, {}
+                ).get(
+                    feature,
+                    np.nan,
+                )
+                for pc in pcs
+            ],
+            dtype=np.float64,
+        )
+
+        ax.bar(
+            pc_numbers,
+            values,
+            alpha=0.85,
+        )
+
+        ax.set_title(
+            f"{hpa} hPa",
+            fontsize=11,
+            fontweight="bold",
+        )
+
+        ax.grid(
+            axis="y",
+            alpha=0.25,
+        )
+
+        # Same scale for every pressure level
+        if score_mode == "abs":
+
+            ax.set_ylim(
+                0.0,
+                limit,
+            )
+
+        else:
+
+            ax.set_ylim(
+                -limit,
+                limit,
+            )
+
+            ax.axhline(
+                0.0,
+                color="black",
+                linewidth=0.7,
+                alpha=0.6,
+            )
+
+        # Don't show every PC label if there are many PCs
+        ax.set_xticks(
+            pc_numbers
+        )
+
+        ax.set_xticklabels(
+            [str(pc) for pc in pc_numbers],
+            rotation=90,
+            fontsize=7,
+        )
+
+    # ----------------------------------------------------------
+    # Labels
+    # ----------------------------------------------------------
+
+    fig.suptitle(
+        f"{feature_label}: correlation across PCs",
+        fontsize=20,
+        fontweight="bold",
+        y=0.995,
+    )
+
+    fig.supxlabel(
+        "Principal component",
+        fontsize=13,
+    )
+
+    if score_mode == "abs":
+
+        fig.supylabel(
+            "Absolute pooled space-time Pearson correlation |r|",
+            fontsize=13,
+        )
+
+    else:
+
+        fig.supylabel(
+            "Pooled space-time Pearson correlation r",
+            fontsize=13,
+        )
+
+    plt.tight_layout(
+        rect=[
+            0.03,
+            0.03,
+            1.0,
+            0.97,
+        ]
+    )
+
+    # ----------------------------------------------------------
+    # Save
+    # ----------------------------------------------------------
+
+    output_path = (
+        output_dir
+        / (
+            f"{feature_base}_"
+            f"correlation_across_pcs_grid.png"
+        )
+    )
+
+    plt.savefig(
+        output_path,
+        dpi=300,
+        bbox_inches="tight",
+    )
+
+    plt.close(fig)
+
+    print(f"Saved {output_path}")
+
 # ============================================================
 # MAIN
 # ============================================================
@@ -1516,6 +1782,23 @@ def main():
                 score_label=score_label,
                 score_mode=SCORE_MODE,
                 add_smooth=ADD_SMOOTH,
+            )
+
+
+    if PER_VARIABLE:
+        for feature_base, feature_label in ATMOSPHERIC_BASES.items():
+
+            out_dir = OUT_DIR / f"grouped_by_feature"
+            os.makedirs(out_dir, exist_ok=True)
+
+            plot_feature_group_grid(
+                scores_by_pc=scores_by_pc,
+                pcs=selected_pcs,
+                feature_base=feature_base,
+                feature_label=feature_label,
+                output_dir=out_dir,
+                score_mode=SCORE_MODE,
+                ncols=4,
             )
 
 
