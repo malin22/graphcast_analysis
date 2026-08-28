@@ -10,6 +10,9 @@ plots/
 
 data/
 
+__pycache__/
+*.py[cod]
+
 plots/malins_experiments/2021_pc_spatial_pattern_stability/data
 plots/malins_experiments/2021_pc_correlations_per_timestep
 
