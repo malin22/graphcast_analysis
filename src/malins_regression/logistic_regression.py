@@ -4,7 +4,6 @@ from glob import glob
 
 import numpy as np
 import pandas as pd
-import xarray as xr
 from sklearn.metrics import precision_recall_curve
 import joblib
 
@@ -21,7 +20,6 @@ from sklearn.metrics import (
 
 from malins_helper_scripts.mesh_context import (
     get_coarse_mesh_node_indices,
-    vertices_to_latlon,
     get_mesh_latlon
 )
 
@@ -31,6 +29,13 @@ from malins_helper_scripts.activation_preprocessing import (
     load_pca_metadata,
     load_raw_activation_years,
 )
+
+from malins_helper_scripts.climatenet_preprocessing import (
+    load_mask_at_nodes,
+    nearest_graphcast_row,
+    parse_mask_timestamp,
+)
+
 
 
 # =====================
@@ -137,24 +142,6 @@ def event_region_metrics(y_true, y_prob, event_id, threshold=0.5):
     return pd.DataFrame(rows)
 
 
-
-
-def parse_mask_timestamp(path):
-    fname = os.path.basename(path).replace(".nc", "")
-    return pd.Timestamp(fname)
-
-
-
-
-def nearest_graphcast_row(mask_time, graphcast_df, max_hours=3):
-    diffs = np.abs(graphcast_df["time"] - mask_time)
-    idx = int(diffs.argmin())
-
-    if diffs.iloc[idx] > pd.Timedelta(hours=max_hours):
-        return None
-
-    return graphcast_df.iloc[idx]
-
 def build_X_for_split(
     matched_df,
     split_mask_events,
@@ -214,53 +201,6 @@ def build_raw_X_for_split(
         )
 
     return np.concatenate(X_parts, axis=0)
-
-
-def load_mask_at_nodes(mask_path, lat, lon, node_indices, label_mode="intersection"):
-    ds = xr.open_dataset(mask_path)
-
-    label = ds["label"]
-
-    if label_mode == "intersection":
-        mask = label.min("annotator")
-    elif label_mode == "union":
-        mask = label.max("annotator")
-    elif label_mode == "soft":
-        mask = label.mean("annotator")
-    else:
-        raise ValueError(f"Unknown label_mode: {label_mode}")
-
-    node_lat = xr.DataArray(lat[node_indices], dims="sample")
-    node_lon = xr.DataArray(lon[node_indices], dims="sample")
-
-    mask_nodes = mask.interp(
-        latitude=node_lat,
-        longitude=node_lon,
-        method="nearest",
-    ).values
-
-    return mask_nodes.astype(np.float32)
-
-
-def safe_metrics(y_true, y_prob, threshold=0.5):
-    y_pred = y_prob >= threshold
-
-    out = {
-        "average_precision": average_precision_score(y_true, y_prob),
-        "f1": f1_score(y_true, y_pred, zero_division=0),
-        "precision": precision_score(y_true, y_pred, zero_division=0),
-        "recall": recall_score(y_true, y_pred, zero_division=0),
-        "positive_rate": float(np.mean(y_true)),
-        "n_positive": int(np.sum(y_true)),
-        "n_total": int(len(y_true)),
-    }
-
-    if len(np.unique(y_true)) == 2:
-        out["roc_auc"] = roc_auc_score(y_true, y_prob)
-    else:
-        out["roc_auc"] = np.nan
-
-    return out
 
 
 
