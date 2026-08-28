@@ -211,9 +211,6 @@ def build_raw_X_for_split(
 def metrics_at_best_f1_threshold(y_true, y_prob):
     """
     Select the threshold that maximizes F1 on the supplied data.
-
-    Note: when called on the test set, the resulting F1 is test-set optimized
-    and should be described as 'best test F1', not as an unbiased test metric.
     """
     precision, recall, thresholds = precision_recall_curve(y_true, y_prob)
 
@@ -241,6 +238,391 @@ def metrics_at_best_f1_threshold(y_true, y_prob):
         "precision": precision_score(y_true, y_pred, zero_division=0),
         "recall": recall_score(y_true, y_pred, zero_division=0),
     }
+
+
+
+def match_climatenet_events(
+    graphcast_df,
+    lat,
+    lon,
+    all_nodes,
+):
+    mask_files = sorted(glob(os.path.join(MASK_DIR, "*.nc")))
+
+    y_parts = []
+    event_parts = []
+    matched_rows = []
+
+    samples_per_t = len(all_nodes)
+
+    for i, mask_path in enumerate(mask_files):
+        mask_time = parse_mask_timestamp(mask_path)
+
+        row = nearest_graphcast_row(
+            mask_time,
+            graphcast_df,
+            max_hours=MAX_TIME_DIFFERENCE_HOURS,
+        )
+
+        if row is None:
+            continue
+
+        graphcast_time = row["time"]
+
+        y_nodes = load_mask_at_nodes(
+            mask_path,
+            lat,
+            lon,
+            all_nodes,
+            label_mode=LABEL_MODE,
+        )
+
+        if LABEL_MODE != "soft":
+            y_nodes = (y_nodes > 0).astype(np.int8)
+
+        event_idx = len(matched_rows)
+
+        y_parts.append(y_nodes)
+        event_parts.append(
+            np.full(samples_per_t, event_idx, dtype=np.int32)
+        )
+
+        matched_row = {
+            "mask_file": os.path.basename(mask_path),
+            "mask_time": mask_time,
+            "graphcast_time": graphcast_time,
+            "year": int(row["year"]),
+            "t_idx": int(row["t_idx"]),
+            "time_difference_hours": abs(
+                graphcast_time - mask_time
+            ).total_seconds() / 3600,
+            "positive_nodes": int(np.sum(y_nodes > 0)),
+            "positive_fraction": float(np.mean(y_nodes > 0)),
+        }
+
+        if REPRESENTATION == "raw_activations":
+            matched_row["activation_file"] = row["activation_file"]
+
+        matched_rows.append(matched_row)
+
+        if (i + 1) % 100 == 0:
+            print(f"Processed {i + 1}/{len(mask_files)} mask files")
+
+    if not y_parts:
+        raise ValueError(
+            f"No {WEATHER_FEATURE} mask files matched GraphCast timestamps."
+        )
+
+    matched_df = pd.DataFrame(matched_rows)
+    y = np.concatenate(y_parts).astype(np.int8)
+    event_id = np.concatenate(event_parts)
+
+    return matched_df, y, event_id
+
+def run_probe_for_feature_count(
+    n_features,
+    matched_df,
+    event_train_mask,
+    event_val_mask,
+    event_test_mask,
+    y_train_all,
+    y_val_all,
+    y_test_all,
+    event_id,
+    test_mask,
+    pc_scores_by_year,
+    all_nodes,
+):
+    print(f"\nBuilding train/test matrices for {n_features} features...")
+
+    if REPRESENTATION == "PCA":
+        X_train = build_X_for_split(
+            matched_df,
+            event_train_mask,
+            pc_scores_by_year,
+            all_nodes,
+            n_features,
+        )
+
+        X_val = build_X_for_split(
+            matched_df,
+            event_val_mask,
+            pc_scores_by_year,
+            all_nodes,
+            n_features,
+        )
+
+        X_test = build_X_for_split(
+            matched_df,
+            event_test_mask,
+            pc_scores_by_year,
+            all_nodes,
+            n_features,
+        )
+
+    elif REPRESENTATION == "raw_activations":
+        X_train = build_raw_X_for_split(
+            matched_df,
+            event_train_mask,
+            all_nodes,
+            n_features,
+        )
+
+        X_val = build_raw_X_for_split(
+            matched_df,
+            event_val_mask,
+            all_nodes,
+            n_features,
+        )
+
+        X_test = build_raw_X_for_split(
+            matched_df,
+            event_test_mask,
+            all_nodes,
+            n_features,
+        )
+    y_train = y_train_all
+    y_val = y_val_all
+    y_test = y_test_all
+
+    valid_train = (
+        np.all(np.isfinite(X_train), axis=1)
+        & np.isfinite(y_train)
+    )
+
+    valid_val = (
+        np.all(np.isfinite(X_val), axis=1)
+        & np.isfinite(y_val)
+    )
+
+    valid_test = (
+        np.all(np.isfinite(X_test), axis=1)
+        & np.isfinite(y_test)
+    )
+
+    X_train = X_train[valid_train]
+    y_train = y_train[valid_train]
+
+    X_val = X_val[valid_val]
+    y_val = y_val[valid_val]
+
+    X_test = X_test[valid_test]
+    y_test = y_test[valid_test]
+
+    event_id_test = event_id[test_mask][valid_test]
+
+    if len(np.unique(y_train)) < 2:
+        print(f"Skipping {n_features} features: train set has only one class")
+        return None
+
+    if len(np.unique(y_test)) < 2:
+        print(f"Skipping {n_features} features: held-out 2021 test set has only one class")
+        return None
+
+    model = make_pipeline(
+        StandardScaler(),
+        LogisticRegression(
+            penalty="l2",
+            class_weight="balanced",
+            max_iter=1000,
+            solver="lbfgs",
+        ),
+    )
+
+    model.fit(X_train, y_train)
+
+    y_val_prob = model.predict_proba(X_val)[:, 1]
+
+    val_metrics = {
+        "val_average_precision": average_precision_score(
+            y_val,
+            y_val_prob,
+        ),
+        "val_positive_rate": float(np.mean(y_val)),
+        "val_n_positive": int(np.sum(y_val)),
+        "val_n_total": int(len(y_val)),
+    }
+
+    if len(np.unique(y_val)) == 2:
+        val_metrics["val_roc_auc"] = roc_auc_score(
+            y_val,
+            y_val_prob,
+        )
+    else:
+        val_metrics["val_roc_auc"] = np.nan
+
+
+    val_best_f1 = metrics_at_best_f1_threshold(
+        y_true=y_val,
+        y_prob=y_val_prob,
+    )
+
+    selected_threshold = val_best_f1["best_threshold"]
+
+    val_metrics.update({
+        "val_best_threshold": selected_threshold,
+        "val_f1": val_best_f1["f1"],
+        "val_precision": val_best_f1["precision"],
+        "val_recall": val_best_f1["recall"],
+    })
+
+    direction_training_window = "2019_2020_train_only"
+
+    scaler = model.named_steps["standardscaler"]
+    clf = model.named_steps["logisticregression"]
+
+    coef_z = clf.coef_[0].astype(np.float32)
+    coef_z_unit = coef_z / np.linalg.norm(coef_z)
+
+    direction_out = os.path.join(
+        OUT_DIR,
+        f"probe_direction_{WEATHER_FEATURE}_{REPRESENTATION}_"
+        f"{LABEL_MODE}_M{NODE_HIERARCHY_LEVEL}_{n_features}_features_"
+        f"{direction_training_window}.npz",
+    )
+
+    save_dict = {
+        "coef_z": coef_z,
+        "coef_z_unit": coef_z_unit,
+        "scaler_mean": scaler.mean_.astype(np.float32),
+        "scaler_scale": scaler.scale_.astype(np.float32),
+        "intercept": clf.intercept_.astype(np.float32),
+        "n_features": np.array([n_features]),
+        "direction_training_window": np.array([direction_training_window]),
+        "train_start": np.array([str(TRAIN_START)]),
+        "train_end": np.array([str(TRAIN_END)]),
+        "val_start": np.array([str(VAL_START)]),
+        "val_end": np.array([str(VAL_END)]),
+        "test_start": np.array([str(TEST_START)]),
+        "test_end": np.array([str(TEST_END)]),
+        "direction_pc_delta": coef_z_unit,
+    }
+
+    np.savez(direction_out, **save_dict)
+
+    model_out = os.path.join(
+        OUT_DIR,
+        f"logistic_probe_model_{WEATHER_FEATURE}_{REPRESENTATION}_"
+        f"{LABEL_MODE}_M{NODE_HIERARCHY_LEVEL}_{n_features}_features_"
+        f"{direction_training_window}.joblib",
+    )
+
+    joblib.dump(model, model_out, compress=3)
+
+    print("Saved probe direction:", direction_out)
+    print("Saved logistic model:", model_out)
+
+    y_test_prob = model.predict_proba(X_test)[:, 1]
+
+    test_metrics = {
+        "test_average_precision": average_precision_score(
+            y_test,
+            y_test_prob,
+        ),
+        "test_positive_rate": float(np.mean(y_test)),
+        "test_n_positive": int(np.sum(y_test)),
+        "test_n_total": int(len(y_test)),
+    }
+
+    if len(np.unique(y_test)) == 2:
+        test_metrics["test_roc_auc"] = roc_auc_score(
+            y_test,
+            y_test_prob,
+        )
+    else:
+        test_metrics["test_roc_auc"] = np.nan
+
+    # Apply threshold selected on validation
+    y_test_pred = y_test_prob >= selected_threshold
+
+    test_metrics.update({
+        "test_threshold": selected_threshold,
+        "test_f1": f1_score(
+            y_test,
+            y_test_pred,
+            zero_division=0,
+        ),
+        "test_precision": precision_score(
+            y_test,
+            y_test_pred,
+            zero_division=0,
+        ),
+        "test_recall": recall_score(
+            y_test,
+            y_test_pred,
+            zero_division=0,
+        ),
+    })
+    
+
+    event_dfs = []
+
+    for threshold in THRESHOLDS:
+        tmp = event_region_metrics(
+            y_true=y_test,
+            y_prob=y_test_prob,
+            event_id=event_id_test,
+            threshold=threshold,
+        )
+        tmp["target"] = WEATHER_FEATURE
+        tmp["representation"] = REPRESENTATION
+        tmp["n_features"] = n_features
+        tmp["label_mode"] = LABEL_MODE
+        event_dfs.append(tmp)
+
+    event_df = pd.concat(event_dfs, ignore_index=True)
+
+    event_meta = matched_df.reset_index().rename(columns={"index": "event_id"})
+    event_df = event_df.merge(event_meta, on="event_id", how="left")
+
+    event_out = os.path.join(
+        OUT_DIR,
+        f"event_region_metrics_{LABEL_MODE}_M{NODE_HIERARCHY_LEVEL}_"
+        f"{n_features}_features_2021_test_max_{MAX_TIME_DIFFERENCE_HOURS}hour.csv",
+    )
+
+    event_df.to_csv(event_out, index=False)
+
+    summary = event_df.groupby("threshold")[[
+        "event_found",
+        "coverage_recall",
+        "precision",
+        "iou",
+        "area_ratio",
+    ]].mean()
+
+    print("\nEvent-level summary:")
+    print(summary)
+    print("Saved event-level metrics:", event_out)
+
+    row = {
+        "target": WEATHER_FEATURE,
+        "label_mode": LABEL_MODE,
+        "n_features": n_features,
+        "model": "logistic_l2_balanced",
+        "direction_training_window": direction_training_window,
+        "n_train": int(len(y_train)),
+        "n_val": int(len(y_val)),
+        "n_test": int(len(y_test)),
+        "train_positive_rate": float(np.mean(y_train)),
+        "test_positive_rate": float(np.mean(y_test)),
+    }
+
+    row.update(test_metrics)
+    row.update(val_metrics)
+
+    print(
+        f"{WEATHER_FEATURE} | Features={n_features:>3d} | "
+        f"TEST AP={test_metrics['test_average_precision']:.3f} | "
+        f"TEST AUC={test_metrics['test_roc_auc']:.3f} | "
+        f"TEST F1@VAL_THRESHOLD={test_metrics['test_f1']:.3f} | "
+        f"threshold={test_metrics['test_threshold']:.6f} | "
+        f"P={test_metrics['test_precision']:.3f} | "
+        f"R={test_metrics['test_recall']:.3f}"
+    )
+
+    del X_train, X_test, X_val
+    return row
 
 # =====================
 # MAIN
@@ -292,78 +674,9 @@ def main():
         )
 
 
+    matched_df, y, event_id = match_climatenet_events(graphcast_df, lat, lon, all_nodes,)
 
-    mask_files = sorted(glob(os.path.join(MASK_DIR, "*.nc")))
-
-    y_parts = []
-    event_parts = []
-    matched_rows = []
-
-    # ---------------------
-    # Match masks to GraphCast times
-    # but do NOT build X yet
-    # ---------------------
-    for i, mask_path in enumerate(mask_files):
-        mask_time = parse_mask_timestamp(mask_path)
-
-        row = nearest_graphcast_row(
-            mask_time,
-            graphcast_df,
-            max_hours=MAX_TIME_DIFFERENCE_HOURS,
-        )
-
-        if row is None:
-            continue
-
-        year = int(row["year"])
-        t_idx = int(row["t_idx"])
-        graphcast_time = row["time"]
-
-        y_nodes = load_mask_at_nodes(
-            mask_path,
-            lat,
-            lon,
-            all_nodes,
-            label_mode=LABEL_MODE,
-        )
-
-        if LABEL_MODE != "soft":
-            y_nodes = (y_nodes > 0).astype(np.int8)
-
-        event_idx = len(matched_rows)
-
-        y_parts.append(y_nodes)
-        event_parts.append(np.full(samples_per_t, event_idx, dtype=np.int32))
-
-        matched_row = {
-            "mask_file": os.path.basename(mask_path),
-            "mask_time": mask_time,
-            "graphcast_time": graphcast_time,
-            "year": year,
-            "t_idx": t_idx,
-            "time_difference_hours": abs(
-                graphcast_time - mask_time
-            ).total_seconds() / 3600,
-            "positive_nodes": int(np.sum(y_nodes > 0)),
-            "positive_fraction": float(np.mean(y_nodes > 0)),
-        }
-
-        if REPRESENTATION == "raw_activations":
-            matched_row["activation_file"] = row["activation_file"]
-
-        matched_rows.append(matched_row)
-
-        if (i + 1) % 100 == 0:
-            print(f"Processed {i + 1}/{len(mask_files)} mask files")
-
-    if not y_parts:
-        raise ValueError(f"No {WEATHER_FEATURE} mask files matched GraphCast timestamps.")
-
-    matched_df = pd.DataFrame(matched_rows)
-    matched_df.to_csv(os.path.join(OUT_DIR, "matched_files.csv"), index=False)
-
-    y = np.concatenate(y_parts, axis=0).astype(np.int8)
-    event_id = np.concatenate(event_parts)
+    matched_df.to_csv( os.path.join(OUT_DIR, "matched_files.csv"),index=False,)
 
     matched_times = pd.to_datetime(matched_df["graphcast_time"].values)
 
@@ -412,296 +725,25 @@ def main():
             print(f"Skipping {n_features}: only {max_features} features available")
             continue
 
-        print(f"\nBuilding train/test matrices for {n_features} features...")
-
-        if REPRESENTATION == "PCA":
-            X_train = build_X_for_split(
-                matched_df,
-                event_train_mask,
-                pc_scores_by_year,
-                all_nodes,
-                n_features,
-            )
-
-            X_val = build_X_for_split(
-                matched_df,
-                event_val_mask,
-                pc_scores_by_year,
-                all_nodes,
-                n_features,
-            )
-
-            X_test = build_X_for_split(
-                matched_df,
-                event_test_mask,
-                pc_scores_by_year,
-                all_nodes,
-                n_features,
-            )
-
-        elif REPRESENTATION == "raw_activations":
-            X_train = build_raw_X_for_split(
-                matched_df,
-                event_train_mask,
-                all_nodes,
-                n_features,
-            )
-
-            X_val = build_raw_X_for_split(
-                matched_df,
-                event_val_mask,
-                all_nodes,
-                n_features,
-            )
-
-            X_test = build_raw_X_for_split(
-                matched_df,
-                event_test_mask,
-                all_nodes,
-                n_features,
-            )
-        y_train = y_train_all
-        y_val = y_val_all
-        y_test = y_test_all
-
-        valid_train = (
-            np.all(np.isfinite(X_train), axis=1)
-            & np.isfinite(y_train)
+        result = run_probe_for_feature_count(
+            n_features=n_features,
+            matched_df=matched_df,
+            event_train_mask=event_train_mask,
+            event_val_mask=event_val_mask,
+            event_test_mask=event_test_mask,
+            y_train_all=y_train_all,
+            y_val_all=y_val_all,
+            y_test_all=y_test_all,
+            event_id=event_id,
+            test_mask=test_mask,
+            pc_scores_by_year=pc_scores_by_year,
+            all_nodes=all_nodes,
         )
 
-        valid_val = (
-            np.all(np.isfinite(X_val), axis=1)
-            & np.isfinite(y_val)
-        )
-
-        valid_test = (
-            np.all(np.isfinite(X_test), axis=1)
-            & np.isfinite(y_test)
-        )
-
-        X_train = X_train[valid_train]
-        y_train = y_train[valid_train]
-
-        X_val = X_val[valid_val]
-        y_val = y_val[valid_val]
-
-        X_test = X_test[valid_test]
-        y_test = y_test[valid_test]
-
-        event_id_test = event_id[test_mask][valid_test]
-
-        if len(np.unique(y_train)) < 2:
-            print(f"Skipping {n_features} features: train set has only one class")
-            continue
-
-        if len(np.unique(y_test)) < 2:
-            print(f"Skipping {n_features} features: held-out 2021 test set has only one class")
-            continue
-
-        model = make_pipeline(
-            StandardScaler(),
-            LogisticRegression(
-                penalty="l2",
-                class_weight="balanced",
-                max_iter=1000,
-                solver="lbfgs",
-            ),
-        )
-
-        model.fit(X_train, y_train)
-
-        y_val_prob = model.predict_proba(X_val)[:, 1]
-
-        val_metrics = {
-            "val_average_precision": average_precision_score(
-                y_val,
-                y_val_prob,
-            ),
-            "val_positive_rate": float(np.mean(y_val)),
-            "val_n_positive": int(np.sum(y_val)),
-            "val_n_total": int(len(y_val)),
-        }
-
-        if len(np.unique(y_val)) == 2:
-            val_metrics["val_roc_auc"] = roc_auc_score(
-                y_val,
-                y_val_prob,
-            )
-        else:
-            val_metrics["val_roc_auc"] = np.nan
+        if result is not None:
+            results.append(result)
 
 
-        val_best_f1 = metrics_at_best_f1_threshold(
-            y_true=y_val,
-            y_prob=y_val_prob,
-        )
-
-        selected_threshold = val_best_f1["best_threshold"]
-
-        val_metrics.update({
-            "val_best_threshold": selected_threshold,
-            "val_f1": val_best_f1["f1"],
-            "val_precision": val_best_f1["precision"],
-            "val_recall": val_best_f1["recall"],
-        })
-
-        direction_training_window = "2019_2020_train_only"
-
-        scaler = model.named_steps["standardscaler"]
-        clf = model.named_steps["logisticregression"]
-
-        coef_z = clf.coef_[0].astype(np.float32)
-        coef_z_unit = coef_z / np.linalg.norm(coef_z)
-
-        direction_out = os.path.join(
-            OUT_DIR,
-            f"probe_direction_{WEATHER_FEATURE}_{REPRESENTATION}_"
-            f"{LABEL_MODE}_M{NODE_HIERARCHY_LEVEL}_{n_features}_features_"
-            f"{direction_training_window}.npz",
-        )
-
-        save_dict = {
-            "coef_z": coef_z,
-            "coef_z_unit": coef_z_unit,
-            "scaler_mean": scaler.mean_.astype(np.float32),
-            "scaler_scale": scaler.scale_.astype(np.float32),
-            "intercept": clf.intercept_.astype(np.float32),
-            "n_features": np.array([n_features]),
-            "direction_training_window": np.array([direction_training_window]),
-            "train_start": np.array([str(TRAIN_START)]),
-            "train_end": np.array([str(TRAIN_END)]),
-            "val_start": np.array([str(VAL_START)]),
-            "val_end": np.array([str(VAL_END)]),
-            "test_start": np.array([str(TEST_START)]),
-            "test_end": np.array([str(TEST_END)]),
-            "direction_pc_delta": coef_z_unit,
-        }
-
-        np.savez(direction_out, **save_dict)
-
-        model_out = os.path.join(
-            OUT_DIR,
-            f"logistic_probe_model_{WEATHER_FEATURE}_{REPRESENTATION}_"
-            f"{LABEL_MODE}_M{NODE_HIERARCHY_LEVEL}_{n_features}_features_"
-            f"{direction_training_window}.joblib",
-        )
-
-        joblib.dump(model, model_out, compress=3)
-
-        print("Saved probe direction:", direction_out)
-        print("Saved logistic model:", model_out)
-
-        y_test_prob = model.predict_proba(X_test)[:, 1]
-
-        test_metrics = {
-            "test_average_precision": average_precision_score(
-                y_test,
-                y_test_prob,
-            ),
-            "test_positive_rate": float(np.mean(y_test)),
-            "test_n_positive": int(np.sum(y_test)),
-            "test_n_total": int(len(y_test)),
-        }
-
-        if len(np.unique(y_test)) == 2:
-            test_metrics["test_roc_auc"] = roc_auc_score(
-                y_test,
-                y_test_prob,
-            )
-        else:
-            test_metrics["test_roc_auc"] = np.nan
-
-        # Apply threshold selected on validation
-        y_test_pred = y_test_prob >= selected_threshold
-
-        test_metrics.update({
-            "test_threshold": selected_threshold,
-            "test_f1": f1_score(
-                y_test,
-                y_test_pred,
-                zero_division=0,
-            ),
-            "test_precision": precision_score(
-                y_test,
-                y_test_pred,
-                zero_division=0,
-            ),
-            "test_recall": recall_score(
-                y_test,
-                y_test_pred,
-                zero_division=0,
-            ),
-        })
-        
-
-        event_dfs = []
-
-        for threshold in THRESHOLDS:
-            tmp = event_region_metrics(
-                y_true=y_test,
-                y_prob=y_test_prob,
-                event_id=event_id_test,
-                threshold=threshold,
-            )
-            tmp["target"] = WEATHER_FEATURE
-            tmp["representation"] = REPRESENTATION
-            tmp["n_features"] = n_features
-            tmp["label_mode"] = LABEL_MODE
-            event_dfs.append(tmp)
-
-        event_df = pd.concat(event_dfs, ignore_index=True)
-
-        event_meta = matched_df.reset_index().rename(columns={"index": "event_id"})
-        event_df = event_df.merge(event_meta, on="event_id", how="left")
-
-        event_out = os.path.join(
-            OUT_DIR,
-            f"event_region_metrics_{LABEL_MODE}_M{NODE_HIERARCHY_LEVEL}_"
-            f"{n_features}_features_2021_test_max_{MAX_TIME_DIFFERENCE_HOURS}hour.csv",
-        )
-
-        event_df.to_csv(event_out, index=False)
-
-        summary = event_df.groupby("threshold")[[
-            "event_found",
-            "coverage_recall",
-            "precision",
-            "iou",
-            "area_ratio",
-        ]].mean()
-
-        print("\nEvent-level summary:")
-        print(summary)
-        print("Saved event-level metrics:", event_out)
-
-        row = {
-            "target": WEATHER_FEATURE,
-            "label_mode": LABEL_MODE,
-            "n_features": n_features,
-            "model": "logistic_l2_balanced",
-            "direction_training_window": direction_training_window,
-            "n_train": int(len(y_train)),
-            "n_val": int(len(y_val)),
-            "n_test": int(len(y_test)),
-            "train_positive_rate": float(np.mean(y_train)),
-            "test_positive_rate": float(np.mean(y_test)),
-        }
-
-        row.update(test_metrics)
-        row.update(val_metrics)
-        results.append(row)
-
-        print(
-            f"{WEATHER_FEATURE} | Features={n_features:>3d} | "
-            f"TEST AP={test_metrics['test_average_precision']:.3f} | "
-            f"TEST AUC={test_metrics['test_roc_auc']:.3f} | "
-            f"TEST F1@VAL_THRESHOLD={test_metrics['test_f1']:.3f} | "
-            f"threshold={test_metrics['test_threshold']:.6f} | "
-            f"P={test_metrics['test_precision']:.3f} | "
-            f"R={test_metrics['test_recall']:.3f}"
-        )
-
-        del X_train, X_test, X_val
 
     df = pd.DataFrame(results)
 
