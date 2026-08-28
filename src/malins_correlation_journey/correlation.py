@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from malins_correlation_journey.mesh_context import (
+from malins_helper_scripts.mesh_context import (
     build_context_features,
     get_coarse_mesh_node_indices,
     get_mesh_vertices,
