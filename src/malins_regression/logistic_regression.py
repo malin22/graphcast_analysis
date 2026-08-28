@@ -47,9 +47,8 @@ REPRESENTATION = "PCA"  # "raw_activations" or "PCA"
 NODE_HIERARCHY_LEVEL = 6
 
 FEATURE_COUNTS_RAW = [512]
-#PC_COUNTS = [5, 10, 25, 50, 100, 200, 300, 400, 512]
+PC_COUNTS = [5, 10, 25, 50, 100, 200, 300, 400, 512]
 
-PC_COUNTS = [512]
 
 # Train/validation/test design:
 TRAIN_START = pd.Timestamp("2019-01-01")
@@ -84,7 +83,7 @@ TIMESTEP_FILES_TXTS = {
 MASK_DIR = f"/share/prj-4d/graphcast_shared/data/ClimateNetLarge/{WEATHER_FEATURE}_labels_cleaned"
 
 OUT_DIR = (
-    f"plots/malins_experiments/logistic_regression/teeest/"
+    f"plots/malins_experiments/logistic_regression"
     f"{WEATHER_FEATURE}/Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}/{REPRESENTATION}/"
 )
 os.makedirs(OUT_DIR, exist_ok=True)
