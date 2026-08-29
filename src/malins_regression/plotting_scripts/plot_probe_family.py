@@ -9,16 +9,16 @@ import matplotlib.pyplot as plt
 # CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "TC"          # "TC" or "AR"
+WEATHER_FEATURE = "AR"          # "TC" or "AR"
 HIERARCHY_LEVEL = 6
 
 RESULTS_BASE = Path(
-    f"results/logistic_regression/"
+    f"results/malins_experiments/logistic_regression/"
     f"{WEATHER_FEATURE}/"
     f"Node_Hierarchy_Level_M{HIERARCHY_LEVEL}"
 )
 
-FOLDER = "selected_pcs_after_coefs"
+FOLDER = "first_pcs_vs_raw_activations"
 
 
 PLOTS_DIR = Path(
@@ -45,28 +45,28 @@ EXPERIMENTS = {
         "include": True,
         "label": "Raw activations",
         "kind": "baseline",
-        "relative_path": "raw_activations/summary.csv",
+        "relative_path": "raw_activations/logistic_probe_AR_raw_activations_intersection_M6_max_3hour.csv",
     },
     "first_pcs": {
         "include": True,
         "label": "First-k PCs",
         "kind": "curve",
-        "relative_path": "first_k_pcs/summary.csv",
+        "relative_path": "first_k_pcs/logistic_probe_AR_first_k_pcs_intersection_M6_max_3hour.csv",
     },
     "selected_pcs": {
-        "include": True,
+        "include": False,
         "label": "Selected PCs (L2 coefficients)",
         "kind": "curve",
-        "relative_path": "selected_pcs_after_coefs/summary.csv",
+        "relative_path": "selected_pcs_after_coefs/logistic_probe_AR_selected_pcs_after_coefs_intersection_M6_max_3hour.csv",
     },
     "selected_raw": {
         "include": False,
         "label": "Selected raw features (L2 coefficients)",
         "kind": "curve",
-        "relative_path": "selected_raw_acts_after_coefs/summary.csv",
+        "relative_path": "selected_raw_acts_after_coefs/logistic_probe_AR_selected_raw_acts_after_coefs_intersection_M6_max_3hour.csv",
     },
     "l1_selected_pcs": {
-        "include": True,
+        "include": False,
         "label": "L1-selected PCs + L2 probe",
         "kind": "point",
         "relative_path": "l1_selected_pcs_l2/summary.csv",
@@ -139,7 +139,7 @@ def load_experiments():
         if not config["include"]:
             continue
 
-        path = RESULTS_BASE / relative_path
+        path = RESULTS_BASE / config['relative_path']
 
         if path is None:
             print(
@@ -255,8 +255,7 @@ def plot_metric(loaded, metric, ylabel, title, filename):
     ax.set_xlabel("Number of latent features")
     ax.set_ylabel(ylabel)
     ax.set_title(
-        f"{WEATHER_FEATURE} — {title}\n"
-        f"GraphCast latent probe, node hierarchy M{HIERARCHY_LEVEL}"
+        f"{WEATHER_FEATURE} — {title}"
     )
     ax.grid(True, alpha=0.3)
     ax.legend()

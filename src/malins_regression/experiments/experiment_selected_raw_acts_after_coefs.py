@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from malins_correlation_journey.run_logistic_probe import (
+from malins_regression.run_logistic_probe import (
     run_logistic_experiment,
 )
 
@@ -12,7 +12,7 @@ from malins_correlation_journey.run_logistic_probe import (
 # EXPERIMENT CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "AR"  # "AR" or "TC"
+WEATHER_FEATURE = "TC"  # "AR" or "TC"
 
 FINE_MESH_LEVEL = 6
 NODE_HIERARCHY_LEVEL = 6

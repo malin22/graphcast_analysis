@@ -11,7 +11,7 @@ from malins_helper_scripts.activation_preprocessing import (
     build_graphcast_time_table,
     load_pca_metadata,
 )
-from malins_helper_scripts.logistic_probe_pipeline import (
+from malins_regression.logistic_probe_pipeline import (
     build_pca_X_for_split,
     build_split_masks,
     evaluate_validation,
@@ -29,7 +29,7 @@ from malins_helper_scripts.mesh_context import (
 # CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "AR"  # "AR" or "TC"
+WEATHER_FEATURE = "TC"  # "AR" or "TC"
 
 FINE_MESH_LEVEL = 6
 NODE_HIERARCHY_LEVEL = 6

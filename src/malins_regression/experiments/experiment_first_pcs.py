@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from malins_correlation_journey.run_logistic_probe import (
+from malins_regression.run_logistic_probe import (
     run_logistic_experiment,
 )
 
@@ -10,7 +10,7 @@ from malins_correlation_journey.run_logistic_probe import (
 # EXPERIMENT CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "AR"  # "AR" or "TC"
+WEATHER_FEATURE = "TC"  # "AR" or "TC"
 
 FINE_MESH_LEVEL = 6
 NODE_HIERARCHY_LEVEL = 6
@@ -47,30 +47,36 @@ TEST_END = pd.Timestamp("2022-01-01")
 PC_SCORES_PATHS = {
     2019: (
         "/share/prj-4d/graphcast_shared/data/"
-        "graphcast_activation_2019_pca/pc_scores.npy"
+        "pc_scores_per_timestep/"
+        "pc_scores_2019_from_2019_2020_pca_per_timestep.npy"
     ),
     2020: (
         "/share/prj-4d/graphcast_shared/data/"
-        "graphcast_activation_2020_pca/pc_scores.npy"
+        "pc_scores_per_timestep/"
+        "pc_scores_2020_from_2019_2020_pca_per_timestep.npy"
     ),
     2021: (
         "/share/prj-4d/graphcast_shared/data/"
-        "graphcast_activation_2021_pca/pc_scores.npy"
+        "pc_scores_per_timestep/"
+        "pc_scores_2021_from_2019_2020_pca_per_timestep.npy"
     ),
 }
 
 TIMESTEP_FILES_TXTS = {
     2019: (
         "/share/prj-4d/graphcast_shared/data/"
-        "graphcast_activation_2019_pca/timestep_files.txt"
+        "pc_scores_per_timestep/"
+        "pc_scores_2019_from_2019_2020_pca_per_timestep_files.txt"
     ),
     2020: (
         "/share/prj-4d/graphcast_shared/data/"
-        "graphcast_activation_2020_pca/timestep_files.txt"
+        "pc_scores_per_timestep/"
+        "pc_scores_2020_from_2019_2020_pca_per_timestep_files.txt"
     ),
     2021: (
         "/share/prj-4d/graphcast_shared/data/"
-        "graphcast_activation_2021_pca/timestep_files.txt"
+        "pc_scores_per_timestep/"
+        "pc_scores_2021_from_2019_2020_pca_per_timestep_files.txt"
     ),
 }
 

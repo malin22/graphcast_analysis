@@ -10,7 +10,7 @@ from malins_regression.run_logistic_probe import (
 # EXPERIMENT CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "AR"  # "AR" or "TC"
+WEATHER_FEATURE = "TC"  # "AR" or "TC"
 
 FINE_MESH_LEVEL = 6
 NODE_HIERARCHY_LEVEL = 6
