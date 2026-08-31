@@ -87,97 +87,11 @@ G = 9.80665
 
 ERA5_DAILY_DIR = "/share/prj-4d/graphcast_shared/data/era5_daily_nc"
 
-def open_era5_day(date_str):
-    """
-    Open one daily ERA5 file.
 
-    Expected filename:
-        era5_YYYY-MM-DD.nc
-    """
-    path = os.path.join(
-        ERA5_DAILY_DIR,
-        f"era5_{date_str}.nc",
-    )
-
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"ERA5 file not found: {path}")
-
-    return xr.open_dataset(path)
     
 
-def standardize_era5_coordinates(ds):
-    """
-    Standardize common ERA5 coordinate names.
-    """
-    rename = {}
-
-    if "latitude" in ds.coords and "lat" not in ds.coords:
-        rename["latitude"] = "lat"
-
-    if "longitude" in ds.coords and "lon" not in ds.coords:
-        rename["longitude"] = "lon"
-
-    if "valid_time" in ds.coords and "time" not in ds.coords:
-        rename["valid_time"] = "time"
-
-    if rename:
-        ds = ds.rename(rename)
-
-    # ERA5 latitude is usually ordered north to south.
-    # Sorting is not strictly required for the metrics, but gives a
-    # conventional ascending coordinate.
-    if "lat" in ds.coords:
-        ds = ds.sortby("lat")
-
-    return ds
 
 
-def load_era5_at_time(valid_time):
-    """
-    Load ERA5 for exactly the requested forecast valid time.
-
-    Returns
-    -------
-    era5_step : xr.Dataset
-        ERA5 dataset at the requested time.
-    era5_path : str
-        Path to the daily ERA5 file.
-    """
-    valid_time = pd.Timestamp(valid_time)
-
-    date_str = valid_time.strftime("%Y-%m-%d")
-    era5_path = os.path.join(
-        ERA5_DAILY_DIR,
-        f"era5_{date_str}.nc",
-    )
-
-    ds = open_era5_day(date_str)
-    ds = standardize_era5_coordinates(ds)
-
-    if "time" not in ds.coords:
-        ds.close()
-        raise ValueError(
-            f"No time coordinate found in ERA5 file: {era5_path}"
-        )
-
-    try:
-        # Select the exact corresponding ERA5 time.
-        era5_step = ds.sel(
-            time=np.datetime64(valid_time.to_datetime64())
-        ).load()
-
-    except KeyError:
-        available_times = pd.to_datetime(ds["time"].values)
-        ds.close()
-
-        raise KeyError(
-            f"ERA5 time {valid_time} was not found in {era5_path}.\n"
-            f"Available times: {list(available_times)}"
-        )
-
-    ds.close()
-
-    return era5_step, era5_path
 
 
 
@@ -324,46 +238,7 @@ def extract_tracked_tc_from_era5(
 
 
 
-def extract_era5_global_ivt_trajectory(forecast_ds):
-    """
-    Calculate global mean ERA5 IVT at every forecast valid time.
 
-    forecast_ds is used only to obtain the valid times and lead times.
-    """
-    records = []
-
-    for t_idx in range(forecast_ds.sizes["time"]):
-        valid_time = get_valid_time(
-            forecast_ds,
-            t_idx,
-        )
-
-        era5_step, era5_file = load_era5_at_time(
-            valid_time
-        )
-
-        era5_ivt = compute_ivt(era5_step)
-
-        global_mean_ivt = area_weighted_mean(
-            era5_ivt
-        )
-
-        lead_h = (
-            pd.to_timedelta(
-                forecast_ds.time.values[t_idx]
-            ).total_seconds()
-            / 3600.0
-        )
-
-        records.append({
-            "source": "ERA5",
-            "lead_hours": lead_h,
-            "forecast_valid_time": str(valid_time),
-            "global_mean_ivt": global_mean_ivt,
-            "era5_file": era5_file,
-        })
-
-    return pd.DataFrame(records)
 # =====================
 # FILE HANDLING
 # =====================
@@ -378,72 +253,6 @@ def get_valid_time(ds, time_index):
     # fallback: CENTER_STR + forecast lead
     return pd.Timestamp(CENTER_STR) + pd.to_timedelta(ds.time.values[time_index])
 
-def parse_gamma_and_time(path):
-    path = Path(path)
-
-    gamma_match = re.match(r"gamma_([+-]?\d+(?:\.\d+)?)\.nc$", path.name)
-
-    if not gamma_match:
-        raise ValueError(f"Could not parse gamma from filename: {path.name}")
-
-    gamma = float(gamma_match.group(1))
-    center_time = pd.Timestamp(path.parent.parent.name)
-
-    return gamma, center_time
-
-
-def discover_files(input_dir):
-    files = sorted(glob.glob(os.path.join(input_dir, "gamma_*.nc")))
-
-    if not files:
-        raise FileNotFoundError(f"No gamma_*.nc files found in {input_dir}")
-
-    rows = []
-    center_time = pd.Timestamp(CENTER_STR)
-
-    for f in files:
-        name = os.path.basename(f)
-        m = re.match(r"gamma_([+-]?\d+(?:\.\d+)?)\.nc$", name)
-
-        if not m:
-            continue
-
-        rows.append({
-            "file": f,
-            "gamma": float(m.group(1)),
-            "center_time": center_time,
-        })
-
-    df = pd.DataFrame(rows).sort_values("gamma").reset_index(drop=True)
-
-    print(f"Found {len(df)} forecast files in {input_dir}")
-    print("Gammas:", sorted(df["gamma"].unique()))
-    print("Center time:", CENTER_STR)
-
-    return df
-
-
-def load_prediction(path, time_selection=None):
-    """
-    time_selection:
-      None    -> keep all rollout lead times
-      'first' -> select first forecast lead
-      'last'  -> select last forecast lead
-    """
-    ds = xr.open_dataset(path)
-
-    if "batch" in ds.dims:
-        ds = ds.isel(batch=0)
-
-    if time_selection is not None and "time" in ds.dims:
-        if time_selection == "first":
-            ds = ds.isel(time=0)
-        elif time_selection == "last":
-            ds = ds.isel(time=-1)
-        else:
-            raise ValueError(f"Unknown time_selection: {time_selection}")
-
-    return ds
 
 
 
@@ -1067,20 +876,7 @@ def plot_delta_wind10_map(delta_wind10, gamma, center_time, out_name, out_dir, l
 
     print("Saved:", out_path)
 
-def plot_ivt_map(ivt, gamma, center_time, out_name, out_dir):
-    plt.figure(figsize=(10, 4.8))
 
-    ivt.plot(
-        cmap="viridis",
-        cbar_kwargs={"label": "IVT"}
-    )
-
-    plt.title(f"IVT gamma={gamma:+.2f}" #, {center_time}"
-    )
-    plt.tight_layout()
-
-    plt.savefig(os.path.join(out_dir, out_name), dpi=300)
-    plt.close()
 
 
 def make_delta_ivt_video(center_time, gamma, control_file, perturbed_file):

@@ -18,6 +18,8 @@ THRESHOLD = 0.9
 
 EXPERIMENT_NAME = f"first_{N_PCS}_pcs"
 
+START_TIME = "2021-02-12T18"
+
 
 # ============================================================
 # PATHS
@@ -272,6 +274,7 @@ def main() -> None:
         experiment_name=EXPERIMENT_NAME,
         weather_feature=WEATHER_FEATURE,
         node_hierarchy_level=NODE_HIERARCHY_LEVEL,
+        start_times=[START_TIME],
     )
 
 

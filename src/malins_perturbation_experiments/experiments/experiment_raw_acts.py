@@ -10,10 +10,12 @@ from malins_perturbation_experiments.run_perturbation import run_perturbation
 # EXPERIMENT CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "AR"
+WEATHER_FEATURE = "TC"
 NODE_HIERARCHY_LEVEL = 6
 
 THRESHOLD = 0.9
+
+START_TIME = "2021-03-10T18"
 
 EXPERIMENT_NAME = "raw_activations"
 
@@ -196,6 +198,7 @@ def main() -> None:
         experiment_name=EXPERIMENT_NAME,
         weather_feature=WEATHER_FEATURE,
         node_hierarchy_level=NODE_HIERARCHY_LEVEL,
+        start_times=[START_TIME],
     )
 
 

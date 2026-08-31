@@ -2,7 +2,7 @@ from pathlib import Path
 
 from malins_perturbation_experiments.perturbation import (
     PerturbationDirection,
-    run_perturbation_experiment,
+    run_perturbation_experiment
 )
 
 
@@ -28,7 +28,7 @@ DEFAULT_GAMMAS = [
     1.0,
 ]
 
-DEFAULT_START_TIME = "2021-02-12T18"
+
 DEFAULT_N_DAYS = 5
 
 DEFAULT_INJECTION_STEPS = (8,)
@@ -52,8 +52,7 @@ def build_output_dir(
         / "perturbation"
         / weather_feature
         / f"Node_Hierarchy_Level_M{node_hierarchy_level}"
-        / experiment_name
-    )
+        / experiment_name / "data" )
 
 
 def run_perturbation(
@@ -91,7 +90,8 @@ def run_perturbation(
         gammas = DEFAULT_GAMMAS
 
     if start_times is None:
-        start_times = DEFAULT_START_TIME
+        raise ValueError(
+            "Please specify start_times for the perturbation experiment.")
 
     if out_dir is None:
         out_dir = build_output_dir(
