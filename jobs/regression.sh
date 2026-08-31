@@ -18,7 +18,8 @@ echo "Working directory: $(pwd)"
 source /home/student/m/mbraatz/miniconda/etc/profile.d/conda.sh
 conda activate graphcast
 
-# Run your script
-srun python -u src/malins_pca_experiments/regression.py
+export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
+
+python -m malins_pca_experiments.run_regression
 
 echo "Finished at: $(date)"
