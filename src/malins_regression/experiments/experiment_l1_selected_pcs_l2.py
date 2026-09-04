@@ -83,7 +83,7 @@ MASK_DIR = (
 # ============================================================
 
 SELECTION_PATH = (
-    f"results/malins_experiments/logistic_regression/"
+    f"results/logistic_regression/"
     f"{WEATHER_FEATURE}/"
     f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}/"
     f"l1_pc_selection/"

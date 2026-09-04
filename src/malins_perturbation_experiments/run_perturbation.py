@@ -52,7 +52,7 @@ def build_output_dir(
         / "perturbation"
         / weather_feature
         / f"Node_Hierarchy_Level_M{node_hierarchy_level}"
-        / experiment_name / "data" )
+        / experiment_name/ )
 
 
 def run_perturbation(

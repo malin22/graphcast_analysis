@@ -472,7 +472,7 @@ def run_perturbation_experiment(
                 random_seed=random_seed,
             )
 
-            center_out_dir = out_dir / center_str
+            center_out_dir = out_dir / center_str / "data"
             center_out_dir.mkdir(parents=True, exist_ok=True)
 
             out_path = center_out_dir / f"gamma_{gamma}.nc"

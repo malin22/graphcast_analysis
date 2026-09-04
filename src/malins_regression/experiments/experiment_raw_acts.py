@@ -53,7 +53,7 @@ MASK_DIR = (
 )
 
 OUT_DIR = (
-    f"results/malins_experiments/logistic_regression/"
+    f"results/logistic_regression/"
     f"{WEATHER_FEATURE}/"
     f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}/"
     f"raw_activations/"

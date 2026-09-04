@@ -51,7 +51,7 @@ TRAIN_YEARS = [2019, 2020]
 TEST_YEARS = [2021]
 
 OUT_DIR = (
-    "results/physical_decoding/"
+    "results/malins_regression/"
     f"{SCORE_VALUES}/{REGRESSION_TYPE}/"
     f"l{NODE_HIERARCHY_LEVEL}_nodes"
 )

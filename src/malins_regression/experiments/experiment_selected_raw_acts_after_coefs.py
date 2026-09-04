@@ -93,7 +93,7 @@ MASK_DIR = (
 # selected raw activation dimensions.
 
 BASE_PROBE_PATH = (
-    f"results/malins_experiments/logistic_regression/"
+    f"results/logistic_regression/"
     f"{WEATHER_FEATURE}/"
     f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}/"
     f"raw_activations/"
@@ -106,7 +106,7 @@ BASE_PROBE_PATH = (
 
 
 OUT_DIR = (
-    f"results/malins_experiments/logistic_regression/"
+    f"results/logistic_regression/"
     f"{WEATHER_FEATURE}/"
     f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}/"
     f"selected_raw_acts_after_coefs/"

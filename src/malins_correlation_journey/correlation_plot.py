@@ -71,13 +71,13 @@ Score modes
 # =====================
 
 CORRELATION_CSV = Path(
-    "plots/malins_experiments/2021_correlation_on_2020_19/"
+    "results/malins_correlation/2021_correlation_on_2020_19/"
     "PCA/l6_nodes/"
     "all_era5_context_pc_correlations_long.csv"
 )
 
 OUT_DIR = Path(
-    "plots/malins_experiments/2021_correlation_on_2020_19/"
+    "malins_plots/2021_correlation_on_2020_19/"
     "PCA/l6_nodes/"
     "correlation_plots"
 )
