@@ -13,12 +13,12 @@ WEATHER_FEATURE = "AR"          # "TC" or "AR"
 HIERARCHY_LEVEL = 6
 
 RESULTS_BASE = Path(
-    f"results/malins_experiments/logistic_regression/"
+    f"results/logistic_regression/"
     f"{WEATHER_FEATURE}/"
     f"Node_Hierarchy_Level_M{HIERARCHY_LEVEL}"
 )
 
-FOLDER = "first_pcs_vs_raw_activations"
+FOLDER = "all"
 
 
 PLOTS_DIR = Path(
@@ -54,13 +54,13 @@ EXPERIMENTS = {
         "relative_path": "first_k_pcs/logistic_probe_AR_first_k_pcs_intersection_M6_max_3hour.csv",
     },
     "selected_pcs": {
-        "include": False,
+        "include": True,
         "label": "Selected PCs (L2 coefficients)",
         "kind": "curve",
         "relative_path": "selected_pcs_after_coefs/logistic_probe_AR_selected_pcs_after_coefs_intersection_M6_max_3hour.csv",
     },
     "selected_raw": {
-        "include": False,
+        "include": True,
         "label": "Selected raw features (L2 coefficients)",
         "kind": "curve",
         "relative_path": "selected_raw_acts_after_coefs/logistic_probe_AR_selected_raw_acts_after_coefs_intersection_M6_max_3hour.csv",
