@@ -18,7 +18,7 @@ from malins_pca_experiments.config import (
 from malins_pca_experiments.streaming_regression import (
     accumulate_training_statistics,
     fit_regression_from_statistics,
-    evaluate_streaming_regression,
+    evaluate_streaming_regressions,
 )
 
 
@@ -79,6 +79,8 @@ def main():
 
         n_train = stats["n"]
 
+        models = {}
+
         for n_features in PC_COUNTS:
 
             print(
@@ -93,28 +95,35 @@ def main():
                 alpha=alpha,
             )
 
-            (
-                r2_test,
-                rmse_test,
-                corr_test,
-                n_test,
-            ) = evaluate_streaming_regression(
-                target=target,
-                all_nodes=all_nodes,
-                n_features=n_features,
-                coef=coef,
-                intercept=intercept,
-            )
+            models[n_features] = {
+                "coef": coef,
+                "intercept": intercept,
+            }
+
+        print(
+            f"Evaluating all {len(models)} models "
+            f"for {target['name']} in one test pass"
+        )
+
+        test_metrics = evaluate_streaming_regressions(
+            target=target,
+            all_nodes=all_nodes,
+            models=models,
+        )
+
+        for n_features in PC_COUNTS:
+
+            metrics = test_metrics[n_features]
 
             results.append({
                 "target": target["name"],
                 "n_features": n_features,
                 "alpha": alpha,
-                "r2_test": r2_test,
-                "rmse_test": rmse_test,
-                "corr_test": corr_test,
+                "r2_test": metrics["r2_test"],
+                "rmse_test": metrics["rmse_test"],
+                "corr_test": metrics["corr_test"],
                 "n_train": n_train,
-                "n_test": n_test,
+                "n_test": metrics["n_test"],
                 "n_selected": n_features,
             })
 
@@ -122,12 +131,13 @@ def main():
                 f"{target['name']:>6s} | "
                 f"features={n_features:>3d} | "
                 f"alpha={alpha:.4g} | "
-                f"test R2={r2_test:.3f} | "
-                f"test r={corr_test:.3f} | "
-                f"test RMSE={rmse_test:.3f}"
+                f"test R2={metrics['r2_test']:.3f} | "
+                f"test r={metrics['corr_test']:.3f} | "
+                f"test RMSE={metrics['rmse_test']:.3f}"
             )
 
         del stats
+        del models
 
     df = pd.DataFrame(results)
 

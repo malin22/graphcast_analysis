@@ -358,102 +358,152 @@ def fit_regression_from_statistics(
 
     return coef, intercept
 
-def evaluate_streaming_regression(
+def evaluate_streaming_regressions(
     target,
     all_nodes,
-    n_features,
-    coef,
-    intercept,
+    models,
 ):
-    n = 0
+    """
+    Evaluate multiple PCA regression models in a single pass
+    through the test data.
 
-    sum_y = 0.0
-    sum_pred = 0.0
+    models:
+        dict mapping n_features -> {
+            "coef": coef,
+            "intercept": intercept,
+        }
 
-    sum_y2 = 0.0
-    sum_pred2 = 0.0
-    sum_ypred = 0.0
+    Returns:
+        dict mapping n_features -> metrics
+    """
 
-    sse = 0.0
+    max_features = max(models)
+
+    stats = {}
+
+    for n_features in models:
+        stats[n_features] = {
+            "n": 0,
+            "sum_y": 0.0,
+            "sum_pred": 0.0,
+            "sum_y2": 0.0,
+            "sum_pred2": 0.0,
+            "sum_ypred": 0.0,
+            "sse": 0.0,
+        }
 
     for X_chunk, y_chunk in iter_pca_target_chunks(
         target=target,
         all_nodes=all_nodes,
-        n_features=n_features,
+        n_features=max_features,
         years=TEST_YEARS,
         chunk_timesteps=1,
     ):
-        pred = (
-            X_chunk @ coef
-            + intercept
+        # Convert once.
+        X_chunk = X_chunk.astype(
+            np.float64,
+            copy=False,
         )
 
-        diff = y_chunk - pred
-
-        sse += np.sum(
-            diff * diff
+        y_chunk = y_chunk.astype(
+            np.float64,
+            copy=False,
         )
 
-        sum_y += np.sum(y_chunk)
-        sum_pred += np.sum(pred)
+        for n_features, model in models.items():
 
-        sum_y2 += np.sum(
-            y_chunk * y_chunk
+            coef = model["coef"]
+            intercept = model["intercept"]
+
+            pred = (
+                X_chunk[:, :n_features] @ coef
+                + intercept
+            )
+
+            diff = y_chunk - pred
+
+            s = stats[n_features]
+
+            s["sse"] += np.sum(
+                diff * diff
+            )
+
+            s["sum_y"] += np.sum(
+                y_chunk
+            )
+
+            s["sum_pred"] += np.sum(
+                pred
+            )
+
+            s["sum_y2"] += np.sum(
+                y_chunk * y_chunk
+            )
+
+            s["sum_pred2"] += np.sum(
+                pred * pred
+            )
+
+            s["sum_ypred"] += np.sum(
+                y_chunk * pred
+            )
+
+            s["n"] += len(y_chunk)
+
+    results = {}
+
+    for n_features, s in stats.items():
+
+        n = s["n"]
+
+        if n == 0:
+            raise RuntimeError(
+                f"No valid test samples for "
+                f"{target['name']}"
+            )
+
+        sst = (
+            s["sum_y2"]
+            - s["sum_y"] ** 2 / n
         )
 
-        sum_pred2 += np.sum(
-            pred * pred
+        r2 = (
+            1.0
+            - s["sse"] / sst
         )
 
-        sum_ypred += np.sum(
-            y_chunk * pred
+        rmse = np.sqrt(
+            s["sse"] / n
         )
 
-        n += len(y_chunk)
-
-        del X_chunk
-        del y_chunk
-        del pred
-        del diff
-
-    if n == 0:
-        raise RuntimeError(
-            f"No valid test samples for {target['name']}"
+        corr_num = (
+            s["sum_ypred"]
+            - s["sum_y"]
+            * s["sum_pred"]
+            / n
         )
 
-    sst = (
-        sum_y2
-        - sum_y ** 2 / n
-    )
-
-    r2 = 1.0 - sse / sst
-
-    rmse = np.sqrt(
-        sse / n
-    )
-
-    corr_num = (
-        sum_ypred
-        - sum_y * sum_pred / n
-    )
-
-    corr_den = np.sqrt(
-        (
-            sum_y2
-            - sum_y ** 2 / n
+        corr_den = np.sqrt(
+            (
+                s["sum_y2"]
+                - s["sum_y"] ** 2 / n
+            )
+            *
+            (
+                s["sum_pred2"]
+                - s["sum_pred"] ** 2 / n
+            )
         )
-        *
-        (
-            sum_pred2
-            - sum_pred ** 2 / n
+
+        corr_test = (
+            corr_num / corr_den
         )
-    )
 
-    corr_test = corr_num / corr_den
+        results[n_features] = {
+            "r2_test": r2,
+            "rmse_test": rmse,
+            "corr_test": corr_test,
+            "n_test": n,
+        }
 
-    return (
-        r2,
-        rmse,
-        corr_test,
-        n,
-    )
+    return results

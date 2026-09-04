@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "AR"          # "TC" or "AR"
+WEATHER_FEATURE = "TC"          # "TC" or "AR"
 HIERARCHY_LEVEL = 6
 
 RESULTS_BASE = Path(
@@ -45,25 +45,25 @@ EXPERIMENTS = {
         "include": True,
         "label": "Raw activations",
         "kind": "baseline",
-        "relative_path": "raw_activations/logistic_probe_AR_raw_activations_intersection_M6_max_3hour.csv",
+        "relative_path": f"raw_activations/logistic_probe_{WEATHER_FEATURE}_raw_activations_intersection_M6_max_3hour.csv",
     },
     "first_pcs": {
         "include": True,
         "label": "First-k PCs",
         "kind": "curve",
-        "relative_path": "first_k_pcs/logistic_probe_AR_first_k_pcs_intersection_M6_max_3hour.csv",
+        "relative_path": f"first_k_pcs/logistic_probe_{WEATHER_FEATURE}_first_k_pcs_intersection_M6_max_3hour.csv",
     },
     "selected_pcs": {
         "include": True,
         "label": "Selected PCs (L2 coefficients)",
         "kind": "curve",
-        "relative_path": "selected_pcs_after_coefs/logistic_probe_AR_selected_pcs_after_coefs_intersection_M6_max_3hour.csv",
+        "relative_path": f"selected_pcs_after_coefs/logistic_probe_{WEATHER_FEATURE}_selected_pcs_after_coefs_intersection_M6_max_3hour.csv",
     },
     "selected_raw": {
         "include": True,
         "label": "Selected raw features (L2 coefficients)",
         "kind": "curve",
-        "relative_path": "selected_raw_acts_after_coefs/logistic_probe_AR_selected_raw_acts_after_coefs_intersection_M6_max_3hour.csv",
+        "relative_path": f"selected_raw_acts_after_coefs/logistic_probe_{WEATHER_FEATURE}_selected_raw_acts_after_coefs_intersection_M6_max_3hour.csv",
     },
     "l1_selected_pcs": {
         "include": False,

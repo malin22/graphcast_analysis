@@ -23,7 +23,7 @@ from malins_helper_scripts.mesh_context import (
 # CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "TC"
+WEATHER_FEATURE = "AR"
 
 FINE_MESH_LEVEL = 6
 NODE_HIERARCHY_LEVEL = 6
@@ -72,7 +72,7 @@ MASK_DIR = (
 )
 
 CACHE_DIR = (
-    f"results/malins_experiments/logistic_regression/"
+    f"results/logistic_regression/"
     f"{WEATHER_FEATURE}/"
     f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}/"
     f"l1_pc_selection/cache/"

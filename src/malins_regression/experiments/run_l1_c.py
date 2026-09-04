@@ -17,7 +17,7 @@ from malins_regression.logistic_probe_pipeline import (
 # CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "TC"
+WEATHER_FEATURE = "AR"
 NODE_HIERARCHY_LEVEL = 6
 
 C_VALUES = np.logspace(-5, 0, 16)
@@ -32,7 +32,7 @@ NONZERO_TOL = 1e-8
 # ============================================================
 
 OUT_DIR = (
-    f"results/malins_experiments/logistic_regression/"
+    f"results/logistic_regression/"
     f"{WEATHER_FEATURE}/"
     f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}/"
     f"l1_pc_selection/"
@@ -222,11 +222,24 @@ def run_one_c(c_index: int):
         coef_l1=coef_l1,
         n_selected=n_selected,
         n_selector_samples=n_selector,
+        l1_n_iter=int(l1_clf.n_iter_[0]),
+        l1_coef_max_abs=float(
+            np.max(np.abs(coef_l1))
+        ),
+        l1_coef_median_abs=float(
+            np.median(np.abs(coef_l1))
+        ),
         **metrics,
     )
 
-    print()
-    print("Validation AP:", metrics["val_average_precision"])
+    
+
+    print(
+        f"C={C:.6g} | "
+        f"selected={n_selected} | "
+        f"n_iter={l1_clf.n_iter_[0]} | "
+        f"val_AP={metrics['val_average_precision']:.4f}"
+    )
     print("Saved:", out_path)
 
 
