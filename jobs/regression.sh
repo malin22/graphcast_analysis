@@ -20,6 +20,7 @@ conda activate graphcast
 
 export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
 
-python -m malins_pca_experiments.run_regression
+PYTHONPATH=src python \
+    -m malins_pca_experiments.run_surface_regression
 
 echo "Finished at: $(date)"

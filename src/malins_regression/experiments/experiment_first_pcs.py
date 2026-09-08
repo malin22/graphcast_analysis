@@ -10,19 +10,20 @@ from malins_regression.run_logistic_probe import (
 # EXPERIMENT CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "TC"  # "AR" or "TC"
+WEATHER_FEATURE = "AR"  # "AR" or "TC"
 
 FINE_MESH_LEVEL = 6
 NODE_HIERARCHY_LEVEL = 6
 
 # Test how much ClimateNet-relevant information is retained as
 # progressively more variance-ranked principal components are used.
-PC_COUNTS = [5, 10, 25, 50, 100, 200, 300, 400, 512]
+PC_COUNTS = [1, 2, 3, 5, 8, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250, 300, 400, 512]
+#[5, 10, 25, 50, 100, 200, 300, 400, 512]
+
 
 LABEL_MODE = "intersection"
 MAX_TIME_DIFFERENCE_HOURS = 3
 
-THRESHOLDS = [0.1, 0.2, 0.3, 0.5]
 
 
 # ============================================================
@@ -123,7 +124,6 @@ def main():
         node_hierarchy_level=NODE_HIERARCHY_LEVEL,
         label_mode=LABEL_MODE,
         max_time_difference_hours=MAX_TIME_DIFFERENCE_HOURS,
-        thresholds=THRESHOLDS,
         train_start=TRAIN_START,
         train_end=TRAIN_END,
         val_start=VAL_START,

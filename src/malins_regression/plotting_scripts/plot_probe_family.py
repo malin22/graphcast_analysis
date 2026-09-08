@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "TC"          # "TC" or "AR"
+WEATHER_FEATURE = "AR"          # "TC" or "AR"
 HIERARCHY_LEVEL = 6
 
 RESULTS_BASE = Path(
@@ -18,7 +18,7 @@ RESULTS_BASE = Path(
     f"Node_Hierarchy_Level_M{HIERARCHY_LEVEL}"
 )
 
-FOLDER = "all"
+FOLDER = "without_l1"
 
 
 PLOTS_DIR = Path(
@@ -55,13 +55,13 @@ EXPERIMENTS = {
     },
     "selected_pcs": {
         "include": True,
-        "label": "Selected PCs (L2 coefficients)",
+        "label": "Coefficient-selected PCs",
         "kind": "curve",
         "relative_path": f"selected_pcs_after_coefs/logistic_probe_{WEATHER_FEATURE}_selected_pcs_after_coefs_intersection_M6_max_3hour.csv",
     },
     "selected_raw": {
         "include": True,
-        "label": "Selected raw features (L2 coefficients)",
+        "label": "Coefficient-selected activations",
         "kind": "curve",
         "relative_path": f"selected_raw_acts_after_coefs/logistic_probe_{WEATHER_FEATURE}_selected_raw_acts_after_coefs_intersection_M6_max_3hour.csv",
     },
@@ -69,7 +69,7 @@ EXPERIMENTS = {
         "include": False,
         "label": "L1-selected PCs + L2 probe",
         "kind": "point",
-        "relative_path": "l1_selected_pcs_l2/summary.csv",
+        "relative_path": f"l1_selected_pcs_l2_sweep/summary.csv",
     },
 }
 
@@ -88,7 +88,7 @@ METRICS = {
     "test_f1": {
         "ylabel": "F1 score",
         "title": "F1 score",
-        "filename": "f1_vs_features.png",
+        "filename": f"f1_vs_features_{WEATHER_FEATURE}.png",
     },
 }
 
@@ -173,7 +173,7 @@ def load_experiments():
 
 
 def plot_metric(loaded, metric, ylabel, title, filename):
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(9, 5))
 
     plotted_anything = False
     all_feature_counts = []
@@ -207,7 +207,8 @@ def plot_metric(loaded, metric, ylabel, title, filename):
             ax.axhline(
                 raw_value,
                 linestyle="--",
-                linewidth=2,
+                linewidth=1.5,
+                color="gray",
                 label=f"{label} ({n_features} dims)",
             )
             all_feature_counts.append(n_features)
@@ -228,7 +229,8 @@ def plot_metric(loaded, metric, ylabel, title, filename):
                 x,
                 y,
                 marker="o",
-                linewidth=2,
+                linewidth=1.5,
+                markersize=4,
                 label=label,
             )
             all_feature_counts.extend(x.tolist())
@@ -243,20 +245,30 @@ def plot_metric(loaded, metric, ylabel, title, filename):
         print(f"[skip plot] No usable data for {metric}")
         return
 
-    # Log x-axis is useful for feature-count sweeps such as
-    # 5, 10, 25, ..., 512.
     positive_counts = sorted({x for x in all_feature_counts if x > 0})
 
     if len(positive_counts) > 1:
         ax.set_xscale("log")
-        ax.set_xticks(positive_counts)
-        ax.set_xticklabels([str(x) for x in positive_counts])
+        ax.set_xlim(right=530)
 
-    ax.set_xlabel("Number of latent features")
+        preferred_ticks = [1, 2, 3, 5, 10, 25, 50, 100, 200, 300, 400, 512]
+
+        tick_counts = [
+            x for x in preferred_ticks
+            if min(positive_counts) <= x <= max(positive_counts)
+        ]
+
+        ax.set_xticks(tick_counts)
+        ax.set_xticklabels([str(x) for x in tick_counts])
+
+    ax.set_xlabel("Number of features")
     ax.set_ylabel(ylabel)
-    ax.set_title(
-        f"{WEATHER_FEATURE} — {title}"
-    )
+
+    if WEATHER_FEATURE == "TC":
+        title = f"Tropical Cyclone — {title}"
+    elif WEATHER_FEATURE == "AR":
+        title = f"Atmospheric River — {title}"
+    ax.set_title(title)
     ax.grid(True, alpha=0.3)
     ax.legend()
 

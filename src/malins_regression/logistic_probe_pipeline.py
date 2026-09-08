@@ -26,45 +26,6 @@ from malins_helper_scripts.climatenet_preprocessing import (
 )
 
 
-def event_region_metrics(y_true, y_prob, event_id, threshold=0.5):
-    """Compute event-level spatial detection metrics at one threshold."""
-    rows = []
-
-    for eid in np.unique(event_id):
-        mask = event_id == eid
-
-        yt = y_true[mask].astype(bool)
-        yp = y_prob[mask]
-
-        if yt.sum() == 0:
-            continue
-
-        pred = yp >= threshold
-
-        true_area = int(yt.sum())
-        pred_area = int(pred.sum())
-        overlap = int((yt & pred).sum())
-        union = int((yt | pred).sum())
-
-        rows.append({
-            "event_id": int(eid),
-            "threshold": threshold,
-            "true_area": true_area,
-            "pred_area": pred_area,
-            "overlap_area": overlap,
-            "event_found": int(overlap > 0),
-            "coverage_recall": overlap / true_area,
-            "precision": overlap / pred_area if pred_area > 0 else 0.0,
-            "iou": overlap / union if union > 0 else 0.0,
-            "area_ratio": pred_area / true_area if true_area > 0 else np.nan,
-            "mean_prob_inside": float(yp[yt].mean()),
-            "mean_prob_outside": float(yp[~yt].mean()),
-            "max_prob_inside": float(yp[yt].max()),
-            "max_prob_outside": float(yp[~yt].max()),
-        })
-
-    return pd.DataFrame(rows)
-
 
 def metrics_at_best_f1_threshold(y_true, y_prob):
     """Select the threshold that maximizes F1 on the supplied data."""
@@ -126,13 +87,10 @@ def match_climatenet_events(
         One row per matched ClimateNet event.
     y : np.ndarray
         Node-level labels concatenated event by event.
-    event_id : np.ndarray
-        Event id for every node-level label.
     """
     mask_files = sorted(glob(os.path.join(mask_dir, "*.nc")))
 
     y_parts = []
-    event_parts = []
     matched_rows = []
 
     samples_per_t = len(all_nodes)
@@ -162,12 +120,9 @@ def match_climatenet_events(
         if label_mode != "soft":
             y_nodes = (y_nodes > 0).astype(np.int8)
 
-        event_idx = len(matched_rows)
 
         y_parts.append(y_nodes)
-        event_parts.append(
-            np.full(samples_per_t, event_idx, dtype=np.int32)
-        )
+
 
         matched_row = {
             "mask_file": os.path.basename(mask_path),
@@ -195,9 +150,8 @@ def match_climatenet_events(
 
     matched_df = pd.DataFrame(matched_rows)
     y = np.concatenate(y_parts).astype(np.int8)
-    event_id = np.concatenate(event_parts)
 
-    return matched_df, y, event_id
+    return matched_df, y
 
 
 def build_split_masks(
@@ -344,20 +298,14 @@ def build_raw_X_for_split(
     return np.concatenate(X_parts, axis=0)
 
 
-def filter_finite_rows(X, y, event_id=None):
+def filter_finite_rows(X, y):
     """Remove rows containing non-finite features or labels."""
     valid = (
         np.all(np.isfinite(X), axis=1)
         & np.isfinite(y)
     )
 
-    X = X[valid]
-    y = y[valid]
-
-    if event_id is None:
-        return X, y, valid
-
-    return X, y, event_id[valid], valid
+    return X[valid], y[valid], valid
 
 
 def fit_logistic_probe(X_train, y_train):
@@ -508,46 +456,3 @@ def save_probe(
 
     np.savez(direction_path, **save_dict)
     joblib.dump(model, model_path, compress=3)
-
-
-def evaluate_event_regions(
-    y_test,
-    y_test_prob,
-    event_id_test,
-    matched_df,
-    thresholds,
-    *,
-    metadata=None,
-):
-    """
-    Compute event-level metrics across fixed reporting thresholds.
-    """
-    event_dfs = []
-
-    for threshold in thresholds:
-        tmp = event_region_metrics(
-            y_true=y_test,
-            y_prob=y_test_prob,
-            event_id=event_id_test,
-            threshold=threshold,
-        )
-
-        if metadata:
-            for key, value in metadata.items():
-                tmp[key] = value
-
-        event_dfs.append(tmp)
-
-    event_df = pd.concat(event_dfs, ignore_index=True)
-
-    event_meta = (
-        matched_df
-        .reset_index()
-        .rename(columns={"index": "event_id"})
-    )
-
-    return event_df.merge(
-        event_meta,
-        on="event_id",
-        how="left",
-    )

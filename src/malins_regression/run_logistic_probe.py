@@ -12,7 +12,6 @@ from malins_regression.logistic_probe_pipeline import (
     build_pca_X_for_split,
     build_raw_X_for_split,
     build_split_masks,
-    evaluate_event_regions,
     evaluate_test,
     evaluate_validation,
     filter_finite_rows,
@@ -37,7 +36,6 @@ def run_logistic_experiment(
     node_hierarchy_level,
     label_mode,
     max_time_difference_hours,
-    thresholds,
     train_start,
     train_end,
     val_start,
@@ -184,7 +182,7 @@ def run_logistic_experiment(
     # 3. ClimateNet matching
     # ========================================================
 
-    matched_df, y, event_id = match_climatenet_events(
+    matched_df, y = match_climatenet_events(
         graphcast_df,
         mask_dir,
         lat,
@@ -378,19 +376,14 @@ def run_logistic_experiment(
             y_val,
         )
 
-        event_id_test = event_id[
-            split_masks["test"]
-        ]
 
         (
             X_test,
             y_test,
-            event_id_test,
             _,
         ) = filter_finite_rows(
             X_test,
             y_test,
-            event_id=event_id_test,
         )
 
         if len(np.unique(y_train)) < 2:
@@ -441,7 +434,7 @@ def run_logistic_experiment(
         # 5e. Held-out test evaluation
         # ----------------------------------------------------
 
-        test_metrics, y_test_prob = evaluate_test(
+        test_metrics, _ = evaluate_test(
             model,
             X_test,
             y_test,
@@ -505,62 +498,9 @@ def run_logistic_experiment(
         print("Saved probe direction:", direction_out)
         print("Saved logistic model:", model_out)
 
-        # ----------------------------------------------------
-        # 5g. Event-level test metrics
-        # ----------------------------------------------------
-
-        event_metadata = {
-            "target": weather_feature,
-            "experiment": experiment_name,
-            "feature_source": feature_source,
-            "n_features": n_features,
-            "label_mode": label_mode,
-        }
-
-        event_df = evaluate_event_regions(
-            y_test=y_test,
-            y_test_prob=y_test_prob,
-            event_id_test=event_id_test,
-            matched_df=matched_df,
-            thresholds=thresholds,
-            metadata=event_metadata,
-        )
-
-        event_out = os.path.join(
-            out_dir,
-            f"event_region_metrics_{weather_feature}_"
-            f"{experiment_name}_{label_mode}_"
-            f"M{node_hierarchy_level}_"
-            f"{n_features}_features_"
-            f"max_{max_time_difference_hours}hour.csv",
-        )
-
-        event_df.to_csv(
-            event_out,
-            index=False,
-        )
-
-        summary = (
-            event_df
-            .groupby("threshold")[
-                [
-                    "event_found",
-                    "coverage_recall",
-                    "precision",
-                    "iou",
-                    "area_ratio",
-                ]
-            ]
-            .mean()
-        )
-
-        print()
-        print("Event-level summary:")
-        print(summary)
-        print("Saved event-level metrics:", event_out)
 
         # ----------------------------------------------------
-        # 5h. Collect summary row
+        # 5g. Collect summary row
         # ----------------------------------------------------
 
         result = {

@@ -2,89 +2,350 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
-BASE_PATH = "plots/malins_experiments/2020_2021_regression/PCA/ridge/l5_nodes"
 
-CSV_PATH = os.path.join(BASE_PATH, "pc_regression_physical_variables_2020train_2021test.csv")
+BASE_PATH = (
+    "results/malins_regression/"
+    "PCA/linear/l6_nodes"
+)
 
-OUT_DIR = os.path.join(BASE_PATH, "figures")
+
+
+OUT_DIR = os.path.join(
+    "malins_plots/regression/"
+    "figures",
+)
 os.makedirs(OUT_DIR, exist_ok=True)
 
 
-SURFACE_VARIABLES = ["2t", "10u", "10v", "msl", "tp"]
+SURFACE_CSV = os.path.join(
+    BASE_PATH,
+    "surface_variables_2019_2020train_2021test.csv",
+)
 
-ATMOSPHERIC_GROUPS = {
-    "temperature": ["t50", "t250", "t500", "t600", "t700", "t850", "t1000"],
-    "u_wind": ["u50", "u250", "u500", "u600", "u700", "u850", "u1000"],
-    "v_wind": ["v50", "v250", "v500", "v600", "v700", "v850", "v1000"],
-    "geopotential": ["z50", "z250", "z500", "z600", "z700", "z850", "z1000"],
-    "specific_humidity": ["q50", "q250", "q500", "q600", "q700", "q850", "q1000"],
-    "vertical_velocity": ["w50", "w250", "w500", "w600", "w700", "w850", "w1000"],
+
+PRESSURE_FILES = {
+    "temperature": (
+        "temperature_all_pressure_levels_"
+        "2019_2020train_2021test.csv"
+    ),
+    "u_component_of_wind": (
+        "u_component_of_wind_all_pressure_levels_"
+        "2019_2020train_2021test.csv"
+    ),
+    "v_component_of_wind": (
+        "v_component_of_wind_all_pressure_levels_"
+        "2019_2020train_2021test.csv"
+    ),
+    "geopotential": (
+        "geopotential_all_pressure_levels_"
+        "2019_2020train_2021test.csv"
+    ),
+    "specific_humidity": (
+        "specific_humidity_all_pressure_levels_"
+        "2019_2020train_2021test.csv"
+    ),
+    "vertical_velocity": (
+        "vertical_velocity_all_pressure_levels_"
+        "2019_2020train_2021test.csv"
+    ),
 }
 
 
-df = pd.read_csv(CSV_PATH)
+PLOT_TITLES = {
+    "temperature": "Temperature",
+    "u_component_of_wind": "Zonal wind",
+    "v_component_of_wind": "Meridional wind",
+    "geopotential": "Geopotential",
+    "specific_humidity": "Specific humidity",
+    "vertical_velocity": "Vertical velocity",
+}
 
-if "n_pcs" not in df.columns and "n_features" in df.columns:
-    df = df.rename(columns={"n_features": "n_pcs"})
+
+SURFACE_VARIABLES = [
+    "2t",
+    "10u",
+    "10v",
+    "msl",
+    "tp",
+]
+
+PRESSURE_LEVELS_TO_PLOT = [
+    1000,
+    850,
+    700,
+    600,
+    500,
+    250,
+    50
+]
 
 
-def plot_r2_group(df, targets, title, filename):
-    plot_df = df[df["target"].isin(targets)].copy()
+def load_results(path):
+    df = pd.read_csv(path)
 
-    order = [t for t in targets if t in plot_df["target"].unique()]
-    plot_df["target"] = pd.Categorical(
-        plot_df["target"],
-        categories=order,
-        ordered=True,
+    if (
+        "n_pcs" not in df.columns
+        and "n_features" in df.columns
+    ):
+        df = df.rename(
+            columns={
+                "n_features": "n_pcs"
+            }
+        )
+
+    return df
+
+
+def setup_pc_axis(df):
+    pc_counts = sorted(
+        df["n_pcs"].unique()
     )
-    plot_df = plot_df.sort_values(["target", "n_pcs"])
 
-    plt.figure(figsize=(9, 5.5))
+    plt.xscale("log")
 
-    for target, g in plot_df.groupby("target", observed=True):
+    plt.xticks(
+        pc_counts,
+        labels=[
+            str(x)
+            for x in pc_counts
+        ],
+    )
+
+
+def plot_surface_variables(df):
+
+    plot_df = df[
+        df["target"].isin(
+            SURFACE_VARIABLES
+        )
+    ].copy()
+
+    plt.figure(
+        figsize=(9, 5.5)
+    )
+
+    for target in SURFACE_VARIABLES:
+
+        g = plot_df[
+            plot_df["target"] == target
+        ].sort_values(
+            "n_pcs"
+        )
+
+        if g.empty:
+            continue
+
         plt.plot(
             g["n_pcs"],
             g["r2_test"],
             marker="o",
             linewidth=2,
-            label=str(target),
+            label=target,
         )
 
-    plt.xscale("log")
-    plt.xticks(
-        sorted(plot_df["n_pcs"].unique()),
-        labels=[str(x) for x in sorted(plot_df["n_pcs"].unique())],
+    setup_pc_axis(
+        plot_df
     )
 
-    plt.xlabel("Number of PCs")
-    plt.ylabel("Test R²")
-    plt.title(title)
-    plt.ylim(0, 1)
-    plt.grid(True, alpha=0.3)
-    plt.legend(title="Target", ncol=3, fontsize=9)
+    plt.xlabel(
+        "Number of PCs"
+    )
 
-    out_path = os.path.join(OUT_DIR, filename)
+    plt.ylabel(
+        "Test R²"
+    )
+
+    plt.title(
+        "Decodability of surface ERA5 variables "
+        "from GraphCast PCs"
+    )
+
+    plt.ylim(
+        0,
+        1,
+    )
+
+    plt.grid(
+        True,
+        alpha=0.3,
+    )
+
+    plt.legend(
+        title="Variable",
+        fontsize=9,
+    )
+
+    out_path = os.path.join(
+        OUT_DIR,
+        "r2_surface_variables.png",
+    )
+
     plt.tight_layout()
-    plt.savefig(out_path, dpi=300, bbox_inches="tight")
+
+    plt.savefig(
+        out_path,
+        dpi=300,
+        bbox_inches="tight",
+    )
+
     plt.close()
 
-    print(f"Saved: {out_path}")
+    print(
+        f"Saved: {out_path}"
+    )
 
 
-# Surface variables together
-plot_r2_group(
+def plot_pressure_variable(
     df,
-    SURFACE_VARIABLES,
-    "Decodability of surface ERA5 variables from GraphCast PCs",
-    "r2_surface_variables.png",
-)
+    variable,
+):
+
+    plot_df = df[
+        df["level"].isin(PRESSURE_LEVELS_TO_PLOT)
+    ].copy()
+
+    plot_df = plot_df.sort_values(
+        [
+            "level",
+            "n_pcs",
+        ]
+    )
+
+    plt.figure(
+        figsize=(11, 7)
+    )
+
+    levels = sorted(
+        plot_df["level"].dropna().unique()
+    )
 
 
-# One plot per atmospheric variable, all levels together
-for group_name, targets in ATMOSPHERIC_GROUPS.items():
-    plot_r2_group(
+    for level in levels:
+
+        g = plot_df[
+            plot_df["level"] == level
+        ].sort_values(
+            "n_pcs"
+        )
+
+        plt.plot(
+            g["n_pcs"],
+            g["r2_test"],
+            marker="o",
+            markersize=3,
+            linewidth=1.4,
+            label=f"{int(level)} hPa",
+        )
+
+    setup_pc_axis(
+        plot_df
+    )
+
+    plt.xlabel(
+        "Number of PCs"
+    )
+
+    plt.ylabel(
+        "Test R²"
+    )
+
+    plt.title(
+        f"Decodability of "
+        f"{PLOT_TITLES[variable]} "
+        f"from GraphCast PCs"
+    )
+
+    plt.ylim(
+        0,
+        1,
+    )
+
+    plt.grid(
+        True,
+        alpha=0.3,
+    )
+
+    plt.legend(
+        title="Pressure level",
+        ncol=4,
+        fontsize=7,
+        title_fontsize=8,
+        bbox_to_anchor=(
+            1.02,
+            1,
+        ),
+        loc="upper left",
+    )
+
+    out_path = os.path.join(
+        OUT_DIR,
+        f"r2_{variable}_levels.png",
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        out_path,
+        dpi=300,
+        bbox_inches="tight",
+    )
+
+    plt.close()
+
+    print(
+        f"Saved: {out_path}"
+    )
+
+
+# --------------------------------------------------
+# Surface variables
+# --------------------------------------------------
+
+if os.path.exists(
+    SURFACE_CSV
+):
+    surface_df = load_results(
+        SURFACE_CSV
+    )
+
+    plot_surface_variables(
+        surface_df
+    )
+
+else:
+    print(
+        f"Skipping missing file: "
+        f"{SURFACE_CSV}"
+    )
+
+
+# --------------------------------------------------
+# Pressure-level variables
+# --------------------------------------------------
+
+for variable, filename in (
+    PRESSURE_FILES.items()
+):
+
+    csv_path = os.path.join(
+        BASE_PATH,
+        filename,
+    )
+
+    if not os.path.exists(
+        csv_path
+    ):
+        print(
+            f"Skipping missing file: "
+            f"{csv_path}"
+        )
+        continue
+
+    df = load_results(
+        csv_path
+    )
+
+    plot_pressure_variable(
         df,
-        targets,
-        f"Decodability of {group_name.replace('_', ' ')} across pressure levels",
-        f"r2_{group_name}_levels.png",
+        variable,
     )

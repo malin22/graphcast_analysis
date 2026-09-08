@@ -20,8 +20,6 @@ FEATURE_COUNTS = [512]
 LABEL_MODE = "intersection"
 MAX_TIME_DIFFERENCE_HOURS = 3
 
-THRESHOLDS = [0.1, 0.2, 0.3, 0.5]
-
 
 # ============================================================
 # TRAIN / VALIDATION / TEST SPLIT
@@ -89,7 +87,6 @@ def main():
         node_hierarchy_level=NODE_HIERARCHY_LEVEL,
         label_mode=LABEL_MODE,
         max_time_difference_hours=MAX_TIME_DIFFERENCE_HOURS,
-        thresholds=THRESHOLDS,
         train_start=TRAIN_START,
         train_end=TRAIN_END,
         val_start=VAL_START,
