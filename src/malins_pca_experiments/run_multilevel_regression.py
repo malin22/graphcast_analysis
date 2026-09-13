@@ -14,6 +14,7 @@ from malins_pca_experiments.config import (
     SCORE_VALUES,
     OUT_DIR,
     PRESSURE_LEVELS,
+    PC_COUNTS,
 )
 
 from malins_pca_experiments.streaming_regression import (
@@ -22,6 +23,7 @@ from malins_pca_experiments.streaming_regression import (
     evaluate_streaming_regressions_multi,
 )
 
+pc_counts = PC_COUNTS
 
 def main():
 
@@ -60,17 +62,6 @@ def main():
             "level": level,
         }
         for level in PRESSURE_LEVELS
-    ]
-
-    pc_counts = [
-        5,
-        10,
-        25,
-        50,
-        100,
-        200,
-        400,
-        512,
     ]
 
     print(

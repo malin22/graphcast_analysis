@@ -2,22 +2,41 @@ from pathlib import Path
 
 import numpy as np
 
-from malins_perturbation_experiments.perturbation import PerturbationDirection
-from malins_perturbation_experiments.run_perturbation import run_perturbation
+from malins_perturbation_experiments.perturbation import (
+    PerturbationDirection,
+    run_first_step_perturbation_experiment,
+)
 
 
 # ============================================================
 # EXPERIMENT CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "TC"
+WEATHER_FEATURE = "AR"
 NODE_HIERARCHY_LEVEL = 6
 
 THRESHOLD = 0.9
 
-START_TIME = "2021-03-10T18"
+START_TIME = "2021-02-12T18"
 
-EXPERIMENT_NAME = "raw_activations"
+EXPERIMENT_NAME = "raw_activations_single_perturbation"
+
+N_DAYS = 5
+
+GAMMAS = [
+    -1.0,
+    -0.5,
+    -0.2,
+    0.0,
+    0.2,
+    0.5,
+    1.0,
+]
+
+INJECTION_STEPS = (8,)
+INJECTION_NODE_SETS = ("mesh_nodes",)
+
+RANDOM_SEED = 0
 
 
 # ============================================================
@@ -26,6 +45,10 @@ EXPERIMENT_NAME = "raw_activations"
 
 PROJECT_ROOT = Path(
     "/home/student/m/mbraatz/share/graphcast_analysis"
+)
+
+ERA5_DATA_DIR = Path(
+    "/share/prj-4d/graphcast_shared/data/era5_daily_nc"
 )
 
 PROBE_PATH = (
@@ -40,6 +63,15 @@ PROBE_PATH = (
         f"intersection_M{NODE_HIERARCHY_LEVEL}_512_features_"
         "2019_2020_train_only.npz"
     )
+)
+
+OUT_DIR = (
+    PROJECT_ROOT
+    / "results"
+    / "perturbation"
+    / WEATHER_FEATURE
+    / f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}"
+    / EXPERIMENT_NAME
 )
 
 
@@ -163,13 +195,18 @@ def build_intervention() -> PerturbationDirection:
     # --------------------------------------------------------
 
     print("============================================")
-    print("Raw-activation perturbation")
+    print("Single-injection raw-activation perturbation")
     print("============================================")
     print("Weather feature:", WEATHER_FEATURE)
     print("Node hierarchy:", NODE_HIERARCHY_LEVEL)
     print("Threshold:", THRESHOLD)
+    print("Start time:", START_TIME)
+    print("Forecast days:", N_DAYS)
+    print("Injection processor steps:", INJECTION_STEPS)
+    print("Injection node sets:", INJECTION_NODE_SETS)
     print()
     print("Probe:", PROBE_PATH)
+    print("Output:", OUT_DIR)
     print()
     print("Probe weight:", probe_weight.shape)
     print("Probe bias:", probe_bias)
@@ -192,12 +229,16 @@ def build_intervention() -> PerturbationDirection:
 def main() -> None:
     intervention = build_intervention()
 
-    run_perturbation(
+    run_first_step_perturbation_experiment(
         intervention=intervention,
-        experiment_name=EXPERIMENT_NAME,
-        weather_feature=WEATHER_FEATURE,
-        node_hierarchy_level=NODE_HIERARCHY_LEVEL,
+        gammas=GAMMAS,
         start_times=[START_TIME],
+        n_days=N_DAYS,
+        era5_data_dir=ERA5_DATA_DIR,
+        out_dir=OUT_DIR,
+        injection_steps=INJECTION_STEPS,
+        injection_node_sets=INJECTION_NODE_SETS,
+        random_seed=RANDOM_SEED,
     )
 
 

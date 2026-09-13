@@ -7,6 +7,7 @@ import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
+from scipy.spatial import cKDTree
 
 from evaluation_helpers import (
     area_weighted_mean, discover_files, find_next_timestep_with_mask,
@@ -21,6 +22,7 @@ CENTER_STR = "2021-02-12T18"
 NODE_HIERARCHY_LEVEL = 6
 CONTROL_GAMMA = 0.0
 MAX_MASK_TIME_DIFFERENCE_HOURS = 3
+AR_BUFFER_KM = 750.0  # Fixed buffer around the initial ClimateNet AR mask; choose a priori.
 TIME_SELECTIONS = ["first", "last"]
 MAKE_DELTA_IVT_MAPS = True
 MAKE_TRAJECTORY_VIDEO = True
@@ -28,6 +30,7 @@ VIDEO_GAMMA_SELECTION = [-0.5, 0.5]
 VIDEO_FPS = 2
 VIDEO_FORMAT = "mp4"
 VIDEO_FRAME_STRIDE = 1
+#
 
 Q_VAR = "specific_humidity"
 U_VAR = "u_component_of_wind"
@@ -866,12 +869,266 @@ def plot_global_ivt_trajectories():
     print("Saved:", era5_csv_path)
 
 
+
+def buffer_mask_km(mask, buffer_km):
+    """
+    Expand a 2-D boolean lat/lon mask by a great-circle distance.
+
+    The returned mask contains every grid point whose spherical distance to
+    at least one positive point in `mask` is <= buffer_km. The same buffered
+    mask can then be held fixed for every gamma and forecast lead time.
+    """
+    mask = mask.astype(bool)
+
+    lat_name = get_lat_name(mask)
+    lon_name = get_lon_name(mask)
+
+    lat = np.asarray(mask[lat_name].values, dtype=float)
+    lon = np.asarray(mask[lon_name].values, dtype=float)
+
+    if lat.ndim != 1 or lon.ndim != 1:
+        raise ValueError(
+            "buffer_mask_km currently expects 1-D latitude and longitude coordinates."
+        )
+
+    positive = np.asarray(mask.values, dtype=bool)
+    if positive.ndim != 2:
+        raise ValueError(f"Expected a 2-D mask, got shape {positive.shape}.")
+    if not positive.any():
+        raise ValueError("Cannot buffer an empty AR mask.")
+
+    lat2d, lon2d = np.meshgrid(lat, lon, indexing="ij")
+
+    lat_rad = np.deg2rad(lat2d.ravel())
+    lon_rad = np.deg2rad(lon2d.ravel())
+
+    xyz = np.column_stack(
+        (
+            np.cos(lat_rad) * np.cos(lon_rad),
+            np.cos(lat_rad) * np.sin(lon_rad),
+            np.sin(lat_rad),
+        )
+    )
+
+    positive_flat = positive.ravel()
+    tree = cKDTree(xyz[positive_flat])
+
+    earth_radius_km = 6371.0088
+    angular_radius = float(buffer_km) / earth_radius_km
+    chord_radius = 2.0 * np.sin(angular_radius / 2.0)
+
+    nearest_distance, _ = tree.query(
+        xyz,
+        k=1,
+        distance_upper_bound=chord_radius,
+    )
+    buffered = np.isfinite(nearest_distance).reshape(positive.shape)
+
+    return xr.DataArray(
+        buffered,
+        dims=mask.dims,
+        coords=mask.coords,
+        name=f"ar_mask_buffer_{buffer_km:g}km",
+    )
+
+
+def load_initial_fixed_ar_region(control_ds, control_ivt):
+    """
+    Load the ClimateNet AR mask at the forecast initialization time and build
+    a fixed buffered evaluation region.
+
+    `control_ivt` is used only as the target lat/lon grid. The ClimateNet mask
+    is requested at CENTER_STR, so the region is defined independently of all
+    perturbed forecasts and remains fixed throughout the rollout.
+    """
+    init_time = pd.Timestamp(CENTER_STR)
+
+    if "time" in control_ivt.dims:
+        grid_template = control_ivt.isel(time=0)
+    else:
+        grid_template = control_ivt
+
+    ar_mask, mask_path, mask_time, mask_diff_h = load_mask_on_grid(
+        init_time,
+        grid_template,
+        MASK_DIR,
+        MAX_MASK_TIME_DIFFERENCE_HOURS,
+    )
+
+    ar_mask = ar_mask.astype(bool)
+    buffered_mask = buffer_mask_km(ar_mask, AR_BUFFER_KM)
+
+    print(
+        f"Fixed AR evaluation region: initialization={init_time}, "
+        f"ClimateNet mask={mask_time}, diff={mask_diff_h:.1f} h, "
+        f"buffer={AR_BUFFER_KM:g} km"
+    )
+
+    return ar_mask, buffered_mask, mask_path, mask_time, mask_diff_h
+
+
+def plot_fixed_ar_delta_ivt_trajectories():
+    """
+    Track the perturbation-induced IVT response through the full forecast
+    inside a fixed region defined by the initial ClimateNet AR mask plus a
+    great-circle buffer.
+
+    Primary metric:
+        area-weighted mean [IVT_gamma - IVT_control] inside the fixed buffer.
+
+    Additional diagnostics are saved for the unbuffered ClimateNet core,
+    outside the buffer, and absolute delta-IVT inside/outside the buffer.
+    """
+    out_dir = os.path.join(
+        OUT_DIR,
+        "ivt_trajectories",
+        f"fixed_initial_ar_buffer_{AR_BUFFER_KM:g}km",
+    )
+    os.makedirs(out_dir, exist_ok=True)
+
+    file_table = discover_files(INPUT_DIR, CENTER_STR)
+
+    if CONTROL_GAMMA not in file_table["gamma"].values:
+        raise ValueError(f"No control gamma={CONTROL_GAMMA} found.")
+
+    control_file = file_table.loc[
+        file_table["gamma"] == CONTROL_GAMMA,
+        "file",
+    ].iloc[0]
+
+    control_ds = load_prediction(control_file, time_selection=None)
+    control_ivt = compute_ivt(control_ds)
+
+    if "time" not in control_ivt.dims:
+        raise ValueError("Expected a time dimension in the control IVT trajectory.")
+
+    ar_mask, buffered_mask, mask_path, mask_time, mask_diff_h = (
+        load_initial_fixed_ar_region(control_ds, control_ivt)
+    )
+
+    gammas = sorted(file_table["gamma"].unique())
+    colors, _, _ = gamma_colors(gammas)
+    records = []
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    for _, row in file_table.sort_values("gamma").iterrows():
+        gamma = row["gamma"]
+
+        ds = load_prediction(row["file"], time_selection=None)
+        ivt = compute_ivt(ds)
+
+        if "time" not in ivt.dims:
+            print(f"[SKIP FIXED-REGION TRAJECTORY] gamma={gamma}: no time dimension")
+            continue
+
+        if ivt.sizes["time"] != control_ivt.sizes["time"]:
+            raise ValueError(
+                f"Time-length mismatch for gamma={gamma}: "
+                f"{ivt.sizes['time']} vs control {control_ivt.sizes['time']}"
+            )
+
+        delta = ivt - control_ivt
+
+        lead_hours = []
+        buffer_values = []
+
+        for t_idx in range(delta.sizes["time"]):
+            delta_t = delta.isel(time=t_idx)
+
+            lead_h = (
+                pd.to_timedelta(delta.time.values[t_idx]).total_seconds()
+                / 3600.0
+            )
+            valid_time = get_valid_time(ds, t_idx, CENTER_STR)
+
+            delta_core_mean = area_weighted_mean(delta_t, ar_mask)
+            delta_buffer_mean = area_weighted_mean(delta_t, buffered_mask)
+            delta_outside_mean = area_weighted_mean(delta_t, ~buffered_mask)
+
+            abs_delta = abs(delta_t)
+            abs_delta_buffer_mean = area_weighted_mean(abs_delta, buffered_mask)
+            abs_delta_outside_mean = area_weighted_mean(abs_delta, ~buffered_mask)
+
+            records.append({
+                "gamma": gamma,
+                "lead_hours": lead_h,
+                "forecast_valid_time": str(valid_time),
+                "initial_mask_time": str(mask_time),
+                "initial_mask_time_diff_h": mask_diff_h,
+                "buffer_km": AR_BUFFER_KM,
+                "mask_file": mask_path,
+                "delta_ivt_initial_ar_core_mean": delta_core_mean,
+                "delta_ivt_fixed_buffer_mean": delta_buffer_mean,
+                "delta_ivt_outside_fixed_buffer_mean": delta_outside_mean,
+                "abs_delta_ivt_fixed_buffer_mean": abs_delta_buffer_mean,
+                "abs_delta_ivt_outside_fixed_buffer_mean": abs_delta_outside_mean,
+                "file": row["file"],
+            })
+
+            lead_hours.append(lead_h)
+            buffer_values.append(delta_buffer_mean)
+
+        ax.plot(
+            lead_hours,
+            buffer_values,
+            marker="o",
+            linewidth=2,
+            color=colors[gamma],
+            label=f"γ={gamma:g}",
+        )
+
+    ax.axhline(0.0, color="black", linewidth=1)
+    ax.set_xlabel("Forecast lead time [hours]")
+    ax.set_ylabel("Mean ΔIVT inside fixed AR region")
+    ax.set_title(
+        f"AR-local IVT response: initial ClimateNet mask + {AR_BUFFER_KM:g} km buffer"
+    )
+    ax.grid(True, alpha=0.3)
+    ax.legend(title="Perturbation", fontsize=8)
+    fig.tight_layout()
+
+    figure_path = os.path.join(
+        out_dir,
+        "delta_ivt_inside_fixed_ar_region_by_gamma.png",
+    )
+    fig.savefig(figure_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+    csv_path = os.path.join(
+        out_dir,
+        "delta_ivt_inside_fixed_ar_region_by_gamma.csv",
+    )
+    pd.DataFrame(records).to_csv(csv_path, index=False)
+
+    # Save the exact evaluation masks so the spatial region is reproducible.
+    mask_ds = xr.Dataset({
+        "initial_ar_mask": ar_mask.astype(np.int8),
+        "fixed_buffered_ar_mask": buffered_mask.astype(np.int8),
+    })
+    mask_ds.attrs["buffer_km"] = float(AR_BUFFER_KM)
+    mask_ds.attrs["requested_initial_time"] = str(pd.Timestamp(CENTER_STR))
+    mask_ds.attrs["climatenet_mask_time"] = str(mask_time)
+    mask_ds.attrs["climatenet_mask_time_diff_h"] = float(mask_diff_h)
+    mask_ds.attrs["climatenet_mask_file"] = str(mask_path)
+
+    mask_path_out = os.path.join(out_dir, "fixed_ar_evaluation_masks.nc")
+    mask_ds.to_netcdf(mask_path_out)
+
+    print("Saved:", figure_path)
+    print("Saved:", csv_path)
+    print("Saved:", mask_path_out)
+
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     for time_selection in TIME_SELECTIONS:
         evaluate_ar(time_selection)
     print("\n[MAKING GAMMA TRAJECTORY PLOT]\n")
     plot_global_ivt_trajectories()
+    print("\n[MAKING FIXED AR-REGION DELTA-IVT TRAJECTORY]\n")
+    plot_fixed_ar_delta_ivt_trajectories()
     if MAKE_TRAJECTORY_VIDEO:
         print("\n[MAKING TRAJECTORY VIDEOS]\n")
         make_all_videos()

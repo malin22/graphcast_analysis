@@ -2,19 +2,21 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
+import numpy as np
+from matplotlib import colormaps
 # ============================================================
 # Paths
 # ============================================================
 
+REGRESSION_TYPE = "ridge"
 BASE_PATH = (
-    "results/malins_regression/"
-    "PCA/linear/l6_nodes"
+    f"results/malins_regression/"
+    f"PCA/{REGRESSION_TYPE}/l6_nodes"
 )
 
 OUT_DIR = os.path.join(
     "malins_plots/regression/"
-    "figures/for_report"
+    f"{REGRESSION_TYPE}/all_pressure_levels"
 )
 
 os.makedirs(
@@ -76,17 +78,41 @@ PRESSURE_FILES = {
 }
 
 
-PRESSURE_LEVELS_TO_PLOT = [
+XX_PRESSURE_LEVELS_TO_PLOT = [
     1000,
     850,
     700,
-    600,
     500,
     250,
+    100,
     50,
 ]
 
+PRESSURE_LEVELS_TO_PLOT = [
+    1, 2, 3, 5, 7, 10, 20, 30, 50, 70,
+    100, 125, 150, 175, 200, 225, 250, 300,
+    350, 400, 450, 500, 550, 600, 650, 700,
+    750, 775, 800, 825, 850, 875, 900, 925,
+    950, 975, 1000,
+]
 
+
+Graphcast_PRESSURE_LEVELS = [ 50, 100, 150, 200, 250, 300,
+    400, 500, 600, 700, 850, 925,
+    950, 975, 1000,
+]
+
+
+
+cmap = colormaps["viridis"]
+
+PRESSURE_COLORS = {
+    level: cmap(x)
+    for level, x in zip(
+        PRESSURE_LEVELS_TO_PLOT,
+        np.linspace(0.15, 0.90, len(PRESSURE_LEVELS_TO_PLOT)),
+    )
+}
 # ============================================================
 # Loading
 # ============================================================
@@ -154,6 +180,7 @@ def plot_pressure_variable(
             marker="o",
             markersize=3,
             linewidth=1.4,
+            color=PRESSURE_COLORS[level],
             label=f"{int(level)} hPa",
         )
 
@@ -255,6 +282,7 @@ def save_pressure_legend():
             marker="o",
             markersize=4,
             linewidth=1.4,
+            color=PRESSURE_COLORS[level],
             label=f"{level} hPa",
         )
 

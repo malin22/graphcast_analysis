@@ -291,6 +291,177 @@ def construct_wrapped_graphcast(
     return predictor
 
 
+
+def construct_unperturbed_graphcast(
+    *,
+    resources: GraphCastResources,
+):
+    """
+    Construct the standard GraphCast predictor without any direction injection.
+    """
+
+    predictor = graphcast.GraphCast(
+        resources.model_config,
+        resources.task_config,
+    )
+
+    predictor = casting.Bfloat16Cast(predictor)
+
+    predictor = normalization.InputsAndResiduals(
+        predictor,
+        diffs_stddev_by_level=resources.diffs_stddev_by_level,
+        mean_by_level=resources.mean_by_level,
+        stddev_by_level=resources.stddev_by_level,
+    )
+
+    predictor = autoregressive.Predictor(
+        predictor,
+        gradient_checkpointing=True,
+    )
+
+    return predictor
+
+
+def make_run_forward_jitted_unperturbed(
+    *,
+    resources: GraphCastResources,
+):
+    """
+    Create a JIT-compiled forward function for normal, unperturbed GraphCast.
+    """
+
+    @hk.transform_with_state
+    def run_forward(
+        model_config,
+        task_config,
+        inputs,
+        targets_template,
+        forcings,
+    ):
+        del model_config, task_config
+
+        predictor = construct_unperturbed_graphcast(
+            resources=resources,
+        )
+
+        return predictor(
+            inputs,
+            targets_template=targets_template,
+            forcings=forcings,
+        )
+
+    apply_fn = functools.partial(
+        run_forward.apply,
+        params=resources.params,
+        state=resources.state,
+        model_config=resources.model_config,
+        task_config=resources.task_config,
+    )
+
+    jitted = jax.jit(apply_fn)
+
+    def drop_state(**kwargs):
+        output, _state = jitted(**kwargs)
+        return output
+
+    return drop_state
+
+
+def run_single_forecast_first_step_only(
+    *,
+    resources: GraphCastResources,
+    intervention: PerturbationDirection,
+    era5_window: xr.Dataset,
+    gamma: float,
+    n_days: int,
+    injection_steps: Sequence[int] = (8,),
+    injection_node_sets: Sequence[str] = ("mesh_nodes",),
+    random_seed: int = 0,
+) -> xr.Dataset:
+    """
+    Run a GraphCast forecast where the direction perturbation is applied only
+    to the first forecast step (+6h).
+
+    All later forecast steps are unperturbed, but they evolve from the
+    perturbed +6h state.
+
+    Example for n_days=5:
+
+        initial state
+            |
+            v
+        +6h   perturbed
+            |
+            v
+        +12h  unperturbed
+            |
+            v
+        +18h  unperturbed
+            |
+           ...
+            |
+            v
+        +120h unperturbed
+    """
+
+    inputs, targets, forcings = data_utils.extract_inputs_targets_forcings(
+        era5_window,
+        target_lead_times=slice("6h", f"{n_days * 24}h"),
+        **dataclasses.asdict(resources.task_config),
+    )
+
+    # Predictor used only for the first +6h forecast.
+    perturbed_forward = make_run_forward_jitted(
+        resources=resources,
+        intervention=intervention,
+        gamma=gamma,
+        injection_steps=injection_steps,
+        injection_node_sets=injection_node_sets,
+    )
+
+    # Predictor used for every forecast step after +6h.
+    unperturbed_forward = make_run_forward_jitted_unperturbed(
+        resources=resources,
+    )
+
+    forecast_step = 0
+
+    def first_step_then_unperturbed(**kwargs):
+        """
+        rollout.chunked_prediction calls this once per forecast chunk.
+
+        Because num_steps_per_chunk=1 below:
+            call 0 -> +6h
+            call 1 -> +12h
+            call 2 -> +18h
+            ...
+        """
+        nonlocal forecast_step
+
+        if forecast_step == 0:
+            predictor_fn = perturbed_forward
+        else:
+            predictor_fn = unperturbed_forward
+
+        prediction = predictor_fn(**kwargs)
+        forecast_step += 1
+
+        return prediction
+
+    prediction = rollout.chunked_prediction(
+        first_step_then_unperturbed,
+        rng=jax.random.PRNGKey(random_seed),
+        inputs=inputs,
+        targets_template=targets * np.nan,
+        forcings=forcings,
+
+        # IMPORTANT:
+        # one outer rollout chunk = one 6-hour GraphCast step
+        num_steps_per_chunk=1,
+    )
+
+    return prediction
+
 def make_run_forward_jitted(
     *,
     resources: GraphCastResources,
@@ -462,6 +633,94 @@ def run_perturbation_experiment(
             )
 
             prediction = run_single_forecast(
+                resources=resources,
+                intervention=intervention,
+                era5_window=era5_window,
+                gamma=float(gamma),
+                n_days=n_days,
+                injection_steps=injection_steps,
+                injection_node_sets=injection_node_sets,
+                random_seed=random_seed,
+            )
+
+            center_out_dir = out_dir / center_str / "data"
+            center_out_dir.mkdir(parents=True, exist_ok=True)
+
+            out_path = center_out_dir / f"gamma_{gamma}.nc"
+            prediction.to_netcdf(out_path)
+
+            print(f"[saved] {out_path}")
+
+    print(f"[all done] {time.time() - started:.1f}s")
+
+
+def run_first_step_perturbation_experiment(
+    *,
+    intervention: PerturbationDirection,
+    gammas: Iterable[float],
+    start_times: str | pd.Timestamp | Sequence[str | pd.Timestamp],
+    n_days: int,
+    era5_data_dir: str | Path,
+    out_dir: str | Path,
+    resources: GraphCastResources | None = None,
+    model_source: str = DEFAULT_MODEL_SOURCE,
+    injection_steps: Sequence[int] = (8,),
+    injection_node_sets: Sequence[str] = ("mesh_nodes",),
+    random_seed: int = 0,
+) -> None:
+    """
+    Run perturbation experiments where the perturbation is applied only
+    during the first (+6h) forecast step.
+
+    The resulting perturbed state is then rolled out normally for the
+    remainder of the forecast.
+    """
+
+    intervention.validate()
+
+    if isinstance(start_times, (str, pd.Timestamp)):
+        start_times = [start_times]
+
+    centers = [
+        np.datetime64(round_to_nearest_6h(value))
+        for value in start_times
+    ]
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if resources is None:
+        resources = load_graphcast_resources(
+            model_source=model_source,
+        )
+
+    activation_manager = get_activation_manager()
+    activation_manager.__init__(
+        enabled=False,
+        save_dir=str(out_dir / "_unused_activations"),
+        save_steps=None,
+        save_node_sets=None,
+        mode="post_res",
+    )
+
+    started = time.time()
+
+    for gamma in gammas:
+        print(f"[gamma] {gamma}")
+
+        for center in centers:
+            center_str = np.datetime_as_string(center, unit="h")
+            print(f"[time] {center_str}")
+
+            activation_manager.set_time(center_str)
+
+            era5_window = forecast_window(
+                data_dir=era5_data_dir,
+                center_time=center_str,
+                n_days=n_days,
+            )
+
+            prediction = run_single_forecast_first_step_only(
                 resources=resources,
                 intervention=intervention,
                 era5_window=era5_window,

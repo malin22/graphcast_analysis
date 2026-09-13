@@ -11,6 +11,7 @@ from malins_pca_experiments.config import (
     REGRESSION_TYPE,
     SCORE_VALUES,
     OUT_DIR,
+    PC_COUNTS
 )
 
 from malins_pca_experiments.streaming_regression import (
@@ -48,17 +49,6 @@ SURFACE_TARGETS = [
     },
 ]
 
-
-PC_COUNTS = [
-    5,
-    10,
-    25,
-    50,
-    100,
-    200,
-    400,
-    512,
-]
 
 
 def main():
