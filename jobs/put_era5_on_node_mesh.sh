@@ -19,7 +19,7 @@ source /home/student/s/sascholle/miniconda3/etc/profile.d/conda.sh
 conda activate graphcast312
 
 # Run your script
-srun python -u src/sabines_correlation_experiments/put_era5_on_node_mesh.py
+srun python -u src/sabines_mapping_experiments/helper_scripts/put_era5_on_node_mesh.py
 
 
 echo "Finished at: $(date)"

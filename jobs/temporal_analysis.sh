@@ -19,7 +19,7 @@ source /home/student/s/sascholle/miniconda3/etc/profile.d/conda.sh
 conda activate graphcast312
 
 # Run your script
-#srun python -u src/sabines_temporal_pattern_experiments/seasonality_cosine.py
-srun python -u src/sabines_temporal_pattern_experiments/diurnal_similarity.py
+srun python -u src/sabines_temporal_pattern_experiments/seasonality_cosine.py --from-npz plots/sabines_experiments/temporality_analysis/pc_seasonal_similarity/test_with_3years/pc_circular_over_all_years.npz 
+#srun python -u src/sabines_temporal_pattern_experiments/diurnal_similarity.py
 
 echo "Finished at: $(date)"

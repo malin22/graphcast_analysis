@@ -10,7 +10,7 @@ from graphcast import grid_mesh_connectivity
 
 INPUT_DIR = Path("/share/prj-4d/graphcast_shared/data/era5_daily_nc")
 OUTPUT_DIR = Path("/share/prj-4d/graphcast_shared/data/era5_daily_mesh")
-YEAR = 2020
+YEAR = 2019
 MESH_LEVEL = 6
 
 # This matches the GraphCast-style radius fraction.

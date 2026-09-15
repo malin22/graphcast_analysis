@@ -5,13 +5,14 @@ from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib import cm, colors
 import numpy as np
 
 PCA_COMPONENTS_PATH = Path("/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2019_2020_layer8.npy")
 PCA_MEAN_PATH = Path("/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2019_2020_layer8.npy")
 
 DEFAULT_ACTIVATION_TEMPLATE = "/share/prj-4d/graphcast_shared/data/graphcast_activation_{year}"
-DEFAULT_OUTPUT_DIR = Path("plots/sabines_experiments/pc_temporal_similarity")
+DEFAULT_OUTPUT_DIR = Path("plots/sabines_experiments/temporality_analysis/pc_seasonal_similarity/test_with_colourgradient")
 
 
 def to_float32(x) -> np.ndarray:
@@ -199,11 +200,18 @@ def circular_similarity_by_lag(normalized_maps, max_lag_days):
     return lags, sim, pair_counts
 
 
-def plot_circular_lag_similarity(lags, sim, pair_counts, pc_labels, output_path):
+def plot_circular_lag_similarity(lags, sim, pair_counts, pc_indices, output_path, cmap_name="viridis"):
+    pc_numbers = pc_indices + 1
+    pc_labels = [f"PC{i}" for i in pc_numbers]
+
     fig, ax1 = plt.subplots(figsize=(14, 6))
 
+    cmap = cm.get_cmap(cmap_name)
+    norm = colors.Normalize(vmin=float(np.min(pc_numbers)), vmax=float(np.max(pc_numbers)))
+
     for pc_idx, label in enumerate(pc_labels):
-        ax1.plot(lags, sim[pc_idx], linewidth=2, label=label)
+        color = cmap(norm(pc_numbers[pc_idx]))
+        ax1.plot(lags, sim[pc_idx], linewidth=2.2, color=color, label=label)
 
     ax1.axhline(0.0, color="black", linewidth=1, alpha=0.4)
 
@@ -212,14 +220,50 @@ def plot_circular_lag_similarity(lags, sim, pair_counts, pc_labels, output_path)
             linestyle = "--" if marker in [365, 730] else ":"
             ax1.axvline(marker, color="gray", linestyle=linestyle, linewidth=1, alpha=0.45)
 
-    ax1.set_xlabel("Circular lag [days]")
-    ax1.set_ylabel("Mean centered cosine similarity")
-    ax1.set_title("Circular lag recurrence of PC spatial patterns")
-    ax1.legend(ncol=2, fontsize=8, loc="upper right")
+    ax1.set_xlabel("Circular lag [days]", labelpad=12, fontsize=18)
+    ax1.set_ylabel("Mean centered cosine similarity", labelpad=12, fontsize=18)
+    ax1.set_title("Circular lag recurrence of PC spatial patterns", pad=15, fontsize=25)
+
+    # Label the repeated annual windows.
+    y_min, y_max = ax1.get_ylim()
+    y_text = y_min + 0.08 * (y_max - y_min)
+
+    if lags[-1] >= 365:
+        ax1.text(
+            182.5,
+            y_text,
+            "Year 1 lag",
+            ha="center",
+            va="bottom",
+            fontsize=14,
+            color="dimgray",
+        )
+
+    if lags[-1] >= 730:
+        ax1.text(
+            547.5,
+            y_text,
+            "Year 2 lag",
+            ha="center",
+            va="bottom",
+            fontsize=14,
+            color="dimgray",
+        )
+
+    # sm = cm.ScalarMappable(norm=norm, cmap=cmap)
+    # sm.set_array([])
+    # cbar = fig.colorbar(sm, ax=ax1, pad=0.015)
+    # cbar.set_label("PC number")
+
+    if len(pc_labels) <= 12:
+        ax1.legend(ncol=2, fontsize=12, loc="upper right", frameon=True)
+
+    ax1.tick_params(axis="x", labelsize=14, pad=6)
+    ax1.tick_params(axis="y", labelsize=14, pad=6)
 
     ax2 = ax1.twinx()
     ax2.plot(lags, pair_counts, color="black", alpha=0.15, linewidth=1.5)
-    ax2.set_ylabel("Number of day pairs")
+    ax2.set_ylabel("Number of day pairs", labelpad=12, fontsize=15)
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=300)
@@ -252,15 +296,55 @@ def main():
         action="store_true",
         help="Also build day-of-year climatology and plot sample counts.",
     )
+    parser.add_argument(
+    "--cmap",
+    default="viridis",
+    help="Matplotlib colormap for the PC line gradient, e.g. viridis, plasma, turbo.",
+)
+    parser.add_argument(
+    "--from-npz",
+    type=Path,
+    default=None,
+    help="If set, skip computation and plot directly from an existing pc_circular_over_all_years.npz file.",
+)
 
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    if args.from_npz is not None: 
+        print(f"Loading precomputed circular recurrence from: {args.from_npz}")
+
+        data = np.load(args.from_npz, allow_pickle=True)
+
+        lags = data["lags"]
+        sim = data["sim"]
+        pair_counts = data["pair_counts"]
+        pc_indices = data["pc_indices"]
+
+        output_path = args.output_dir / "pc_circular_over_all_years_from_npz.png"
+
+        plot_circular_lag_similarity(
+            lags,
+            sim,
+            pair_counts,
+            pc_indices,
+            output_path,
+            cmap_name=args.cmap,
+        )
+
+        print(f"Saved {output_path}")
+        return
+
+
     pca_components = np.load(PCA_COMPONENTS_PATH)
     pca_mean = np.load(PCA_MEAN_PATH)
 
+    print(f"PCA components shape: {pca_components.shape}")
+    print(f"PCA mean shape: {pca_mean.shape}")
+
     pc_indices = np.asarray(args.pc_indices, dtype=np.int64)
     pc_labels = [f"PC{i + 1}" for i in pc_indices]
+    pc_numbers = pc_indices + 1
 
     all_dates, all_maps = load_all_daily_maps(
         years=args.years,
@@ -294,8 +378,9 @@ def main():
         lags,
         sim,
         pair_counts,
-        pc_labels,
+        pc_indices,
         args.output_dir / "pc_circular_over_all_years.png",
+        cmap_name=args.cmap,
     )
 
     if args.also_plot_climatology_counts:

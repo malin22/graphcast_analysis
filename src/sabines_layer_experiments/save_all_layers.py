@@ -25,14 +25,14 @@ from graphcast.deep_typed_graph_net import get_activation_manager
 
 
 DATA_DIR = "/share/prj-4d/graphcast_shared/data/era5_daily_nc"
-ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activations_all_layers_Mar_2020"
+ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activations_all_layers_2019"
 
 # Zero-based processor layers. These save as layer0000 ... layer0015.
 SAVE_STEPS = list(range(16))
 
 CENTERS = np.arange(
-    np.datetime64("2020-02-01T00"),
-    np.datetime64("2020-03-01T00"),
+    np.datetime64("2019-11-01T00"),
+    np.datetime64("2020-12-01T00"),
     np.timedelta64(6, "h"),
 )
 

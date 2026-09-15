@@ -405,6 +405,42 @@ def aggregate_scores(scores_by_pc, pcs=None, aggregation="mean"):
 
     return out
 
+def aggregate_scores_with_std(scores_by_pc, pcs=None, aggregation="mean"):
+    """
+    Returns:
+      labels, means, stds
+
+    Computes per-feature mean/std across selected PCs.
+    Missing features are ignored, not treated as zero.
+    """
+    pcs = get_selected_pcs(scores_by_pc, pcs)
+
+    feature_values = {}
+
+    for pc in pcs:
+        for feature, score in scores_by_pc.get(pc, {}).items():
+            if not np.isfinite(score):
+                continue
+            feature_values.setdefault(feature, []).append(float(score))
+
+    labels = []
+    means = []
+    stds = []
+
+    for feature, values in feature_values.items():
+        values = np.asarray(values, dtype=np.float64)
+
+        labels.append(feature)
+
+        if aggregation == "median":
+            means.append(float(np.nanmedian(values)))
+        else:
+            means.append(float(np.nanmean(values)))
+
+        stds.append(float(np.nanstd(values)))
+
+    return labels, np.asarray(means), np.asarray(stds)
+
 
 def build_plot_rows(feature_scores):
     feature_scores = combine_feature_groups(feature_scores)
@@ -466,7 +502,7 @@ def annotate_top_k_bars(ax, scores, y, k=3, x_max=None, color="black"):
             f"#{rank}",
             va="center",
             ha="left",
-            fontsize=8,
+            fontsize=16,
             fontweight="bold",
             color=color,
         )
@@ -541,12 +577,13 @@ def plot_rows(rows, title, score_label, output_path, add_smooth=True):
             alpha=0.75,
             label="smoothed trend",
         )
-        ax.legend(loc="lower right")
+        ax.legend(loc="lower right", fontsize=18)
 
     ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=8)
-    ax.set_xlabel(score_label)
-    ax.set_title(title)
+    ax.set_yticklabels(labels, fontsize=10)
+    ax.set_xlabel(score_label, fontsize=35, labelpad=16)
+    ax.tick_params(axis="x", labelsize=20)
+    ax.set_title(title, fontsize=33, pad=30)
     ax.invert_yaxis()
     ax.grid(axis="x", alpha=0.25)
 
@@ -554,7 +591,7 @@ def plot_rows(rows, title, score_label, output_path, add_smooth=True):
     if x_max <= 0:
         x_max = 1.0
 
-    ax.set_xlim(0, x_max * 1.32)
+    ax.set_xlim(0, x_max * 1.7)
 
     # Category separators and right-side grouped labels.
     for cat in CATEGORY_ORDER:
@@ -584,12 +621,12 @@ def plot_rows(rows, title, score_label, output_path, add_smooth=True):
 
         # Right-side category label.
         ax.text(
-            x_max * 1.08,
+            x_max * 1.09,
             mid,
             cat,
             va="center",
             ha="left",
-            fontsize=10,
+            fontsize=23,
             fontweight="bold",
             color=color,
         )
@@ -765,6 +802,41 @@ def plot_per_pc_separate(
             add_smooth=add_smooth,
         )
         write_csv(rows, pc_dir / f"{filename_prefix}_{safe_pc}.csv") 
+
+def plot_aggregate_bar_with_std(
+    labels,
+    scores,
+    stds,
+    score_label,
+    title,
+    output_path,
+    colors=None,
+):
+    y = np.arange(len(labels))
+
+    fig, ax = plt.subplots(figsize=(10, max(6, 0.35 * len(labels))))
+
+    ax.barh(
+        y,
+        scores,
+        xerr=stds,
+        color=colors,
+        ecolor="black",
+        capsize=3,
+        error_kw={"elinewidth": 1.0, "alpha": 0.75},
+    )
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(labels, fontsize=12)
+    ax.set_xlabel(score_label, fontsize=16, labelpad=10)
+    ax.set_title(title, fontsize=18, pad=14)
+    ax.tick_params(axis="x", labelsize=12)
+    ax.invert_yaxis()
+    ax.grid(axis="x", alpha=0.25)
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
 
 
 def write_csv(rows, output_path):
@@ -950,6 +1022,26 @@ def main():
                     filename_prefix=f"regression_variable_importance_{norm_label}",
                     add_smooth=not args.no_smooth,
                 )
+
+    labels, scores, stds = aggregate_scores_with_std(
+        scores_by_pc=filtered_scores_by_pc,
+        pcs=pcs,
+        aggregation=args.aggregation,
+    )
+
+    order = np.argsort(scores)
+    labels = [labels[i] for i in order]
+    scores = scores[order]
+    stds = stds[order]
+
+    plot_aggregate_bar_with_std(
+        labels=labels,
+        scores=scores,
+        stds=stds,
+        score_label="Mean absolute spatial Pearson r",
+        title="Correlation variable importance across selected PCs",
+        output_path=args.out_dir / "correlation_variable_importance_mean_selected_pcs_with_std.png",
+    )
 
 
 if __name__ == "__main__":

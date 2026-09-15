@@ -7,6 +7,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.decomposition import IncrementalPCA
 from graphcast import icosahedral_mesh
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 
 from collections import Counter
 import re
@@ -42,19 +44,113 @@ def get_mesh_latlon(splits: int = 6):
     vertices = meshes[6].vertices
     return vertices_to_latlon(vertices)
 
+def make_pc_map_axes(add_world_map=False, world_map_resolution="110m"):
+    """
+    Create map axes. If add_world_map=True, tries to use cartopy.
+    Falls back to plain matplotlib axes if cartopy is unavailable.
+    """
+    if not add_world_map:
+        fig, ax = plt.subplots(figsize=(12, 6))
+        return fig, ax, None
 
-def plot_pc_map(scores, lat, lon, out_path, title):
+    try:
+        fig = plt.figure(figsize=(12, 6))
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        ax.set_global()
+
+        ax.add_feature(
+            cfeature.LAND.with_scale(world_map_resolution),
+            facecolor="lightgray",
+            edgecolor="none",
+            alpha=0.35,
+            zorder=0,
+        )
+        ax.add_feature(
+            cfeature.COASTLINE.with_scale(world_map_resolution),
+            linewidth=0.45,
+            edgecolor="black",
+            alpha=0.55,
+            zorder=1,
+        )
+        ax.add_feature(
+            cfeature.BORDERS.with_scale(world_map_resolution),
+            linewidth=0.25,
+            edgecolor="black",
+            alpha=0.25,
+            zorder=1,
+        )
+
+        return fig, ax, ccrs.PlateCarree()
+
+    except Exception as e:
+        print(f"WARNING: could not add cartopy world map background: {e}")
+        print("Falling back to plain lon/lat scatter plot.")
+        fig, ax = plt.subplots(figsize=(12, 6))
+        return fig, ax, None
+
+
+def plot_pc_map(
+    scores,
+    lat,
+    lon,
+    out_path,
+    title,
+    add_world_map=False,
+    world_map_resolution="110m",
+):
     vmax = np.percentile(np.abs(scores), 99)
     vmax = max(vmax, 1e-6)
-    plt.figure(figsize=(12, 6))
-    sc = plt.scatter(lon, lat, c=scores, s=2, cmap="coolwarm", vmin=-vmax, vmax=vmax, linewidths=0)
-    plt.colorbar(sc, label="PC score")
-    plt.xlabel("Longitude")
-    plt.ylabel("Latitude")
-    plt.title(title)
+
+    fig, ax, transform = make_pc_map_axes(
+        add_world_map=add_world_map,
+        world_map_resolution=world_map_resolution,
+    )
+
+    scatter_kwargs = {}
+    if transform is not None:
+        scatter_kwargs["transform"] = transform
+
+    sc = ax.scatter(
+        lon,
+        lat,
+        c=scores,
+        s=2,
+        cmap="coolwarm",
+        vmin=-vmax,
+        vmax=vmax,
+        linewidths=0,
+        zorder=2,
+        **scatter_kwargs,
+    )
+
+    cbar = plt.colorbar(sc, ax=ax)
+    cbar.set_label("PC score", fontsize=14, labelpad=12)
+    cbar.ax.tick_params(labelsize=12)
+
+    if transform is None:
+        ax.set_xlim(-180, 180)
+        ax.set_ylim(-90, 90)
+        ax.set_xlabel("Longitude", fontsize=18)
+        ax.set_ylabel("Latitude", fontsize=18)
+    else:
+        gl = ax.gridlines(
+            draw_labels=True,
+            linewidth=0.3,
+            color="gray",
+            alpha=0.35,
+            linestyle="--",
+        )
+        gl.top_labels = False
+        gl.right_labels = False
+        gl.xlabel_style = {"size": 14}
+        gl.ylabel_style = {"size": 14}
+
+    ax.tick_params(axis="both", labelsize=14)
+    ax.set_title(title, fontsize=25, pad=14)
+
     plt.tight_layout()
     plt.savefig(out_path, dpi=300, bbox_inches="tight")
-    plt.close()
+    plt.close(fig)
 
 
 def plot_yearly_mean_pcs(
@@ -65,6 +161,8 @@ def plot_yearly_mean_pcs(
     n_top_pcs=5,
     use_last_pcs=False,
     scramble_activations=False,
+    add_world_map=False,
+    world_map_resolution="110m",
 ):
     os.makedirs(out_dir, exist_ok=True)
 
@@ -79,7 +177,8 @@ def plot_yearly_mean_pcs(
         pc_labels = range(1, n_top_pcs + 1)
 
     #npy_files = sorted(glob(os.path.join(acts_dir, "*.npy")))
-    pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t*.npy"
+    pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t2021-*.npy"
+    #pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t2021-01-01T00.npy"
     npy_files = sorted(glob(os.path.join(acts_dir, pattern)))
 
     if not npy_files:
@@ -133,7 +232,11 @@ def plot_yearly_mean_pcs(
             lat,
             lon,
             os.path.join(out_dir, f"pc{pc_num}_mean_activation_map_year.png"),
+            #os.path.join(out_dir, f"pc{pc_num}_activation_map_Jan1.png"),
+            #title=f"PC1 of t2021-01-01T00",
             title=f"Year-mean PC{pc_num} activation map",
+            add_world_map=add_world_map,
+            world_map_resolution=world_map_resolution,
         )
 
     print(f"Saved yearly mean PC maps from {valid_count} files to {out_dir}")
@@ -206,7 +309,7 @@ def run_pca(
     os.makedirs(out_dir, exist_ok=True)
 
     # Find all .npy files
-    pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t*.npy"
+    pattern = "layer00*_mesh_gnn_post_res_nodes_mesh_nodes_t2019*.npy"
     npy_files = collect_activation_files(acts_dir, pattern)
 
     print(f"Found {len(npy_files)} activation files in total")
@@ -306,8 +409,8 @@ def run_pca(
     return ipca
 
 if __name__ == "__main__":
-    ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activation_2021" # can also pass in a list for running ipca on multiple years
-    PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only"
+    ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activations_all_layers_2019" #"/share/prj-4d/graphcast_shared/data/graphcast_activation_2021" # can also pass in a list for running ipca on multiple years
+    PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/all_layers"
     #PLOTS_OUT    = "plots/2021_projected_on_2021"
 
     # ipca = run_pca(
@@ -315,17 +418,18 @@ if __name__ == "__main__":
     #     n_components=512,
     #     batch_size=10,
     #     out_dir=PCA_DIR,
-    #     output_tag="2019_2020_layer8",
+    #     output_tag="2019_all_layers",
   
     # )
     
 
     plot_yearly_mean_pcs(
-        acts_dir=ACTS_DIR,
+        acts_dir="/share/prj-4d/graphcast_shared/data/graphcast_activation_2021",
         pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2019_2020_layer8.npy',
         pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2019_2020_layer8.npy',
-        out_dir="plots/2019_2020_pca_projected_on_2021",
-        n_top_pcs=512,
+        out_dir="plots/2019_2020_pca_projected_on_2021/Jan1_plot",
+        n_top_pcs=1,
         use_last_pcs=False,
         scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
+        add_world_map=False,
     )
