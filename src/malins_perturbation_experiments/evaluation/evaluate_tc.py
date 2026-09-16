@@ -17,7 +17,7 @@ from evaluation_helpers import (
 WEATHER_FEATURE = "TC"
 THRESHOLD = 0.9
 CENTER_STR = "2021-03-10T18"
-ACTIVATION_TYPE="raw_activations"
+ACTIVATION_TYPE="raw_activations_new_normalization"
 NODE_HIERARCHY_LEVEL = 6
 CONTROL_GAMMA = 0.0
 MAX_MASK_TIME_DIFFERENCE_HOURS = 3

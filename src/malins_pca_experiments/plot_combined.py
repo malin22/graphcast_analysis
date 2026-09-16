@@ -16,7 +16,7 @@ BASE_PATH = (
 
 OUT_DIR = os.path.join(
     "malins_plots/regression/"
-    f"{REGRESSION_TYPE}/all_pressure_levels"
+    f"{REGRESSION_TYPE}/for_report_new"
 )
 
 os.makedirs(
@@ -78,7 +78,7 @@ PRESSURE_FILES = {
 }
 
 
-XX_PRESSURE_LEVELS_TO_PLOT = [
+PRESSURE_LEVELS_TO_PLOT = [
     1000,
     850,
     700,
@@ -88,7 +88,7 @@ XX_PRESSURE_LEVELS_TO_PLOT = [
     50,
 ]
 
-PRESSURE_LEVELS_TO_PLOT = [
+XXX_PRESSURE_LEVELS_TO_PLOT = [
     1, 2, 3, 5, 7, 10, 20, 30, 50, 70,
     100, 125, 150, 175, 200, 225, 250, 300,
     350, 400, 450, 500, 550, 600, 650, 700,

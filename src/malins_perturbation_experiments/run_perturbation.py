@@ -28,6 +28,10 @@ DEFAULT_GAMMAS = [
     1.0,
 ]
 
+XX_DEFAULT_GAMMAS = [
+    -0.5
+]
+
 
 DEFAULT_N_DAYS = 5
 
