@@ -86,7 +86,7 @@ centers = [np.datetime64(center)]
 
 PROBE_BASE_DIR = (
     f"/home/student/m/mbraatz/share/graphcast_analysis/"
-    f"plots/malins_experiments/logistic_regression/"
+    f"plots/malins_experiments/extreme_weather_events/"
     f"{WEATHER_FEATURE}/Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}"
 )
 pca_components = None

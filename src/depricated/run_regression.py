@@ -2,11 +2,11 @@ import os
 
 import pandas as pd
 
-from malins_helper_scripts.mesh_context import (
+from preprocessing.mesh_context import (
     get_coarse_mesh_node_indices,
 )
 
-from malins_pca_experiments.config import (
+from regression.atmospheric_variables.config import (
     NODE_HIERARCHY_LEVEL,
     PC_COUNTS,
     REGRESSION_TYPE,
@@ -15,7 +15,7 @@ from malins_pca_experiments.config import (
     TARGETS,
 )
 
-from malins_pca_experiments.streaming_regression import (
+from regression.atmospheric_variables.streaming_regression import (
     accumulate_training_statistics,
     fit_regression_from_statistics,
     evaluate_streaming_regressions,
