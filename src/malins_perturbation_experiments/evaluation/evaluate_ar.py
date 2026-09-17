@@ -17,7 +17,7 @@ from evaluation_helpers import (
 WEATHER_FEATURE = "AR"
 THRESHOLD = 0.0
 ACTIVATION_TYPE="raw_activations_new_normalization_no_threshold" # "raw_activations_single_perturbation" or "raw_activation" or " "
-CENTER_STR = "2021-02-12T18"
+CENTER_STR = "2021-07-18T00"
 NODE_HIERARCHY_LEVEL = 6
 CONTROL_GAMMA = 0.0
 MAX_MASK_TIME_DIFFERENCE_HOURS = 3

@@ -37,7 +37,7 @@ from evaluation_helpers import (
 # -----------------------------------------------------------------------------
 WEATHER_FEATURE = "AR"
 ACTIVATION_TYPE = "raw_activations_new_normalization_no_threshold"
-CENTER_STR = "2021-02-12T18"
+CENTER_STR = "2021-07-18T00"
 NODE_HIERARCHY_LEVEL = 6
 CONTROL_GAMMA = 0.0
 MAX_MASK_TIME_DIFFERENCE_HOURS = 3
@@ -330,8 +330,8 @@ def draw_spatial_panel(ax, ivt_cache, gamma, idx, valid_times, vmax, show_mask=T
         delta[lon].values, delta[lat].values, delta.values,
         cmap="RdBu_r", vmin=-vmax, vmax=vmax, shading="auto", rasterized=True,
     )
-    #if show_mask:
-        #add_mask_contour_if_available(ax, delta, valid_times[idx])
+    if show_mask:
+        add_mask_contour_if_available(ax, delta, valid_times[idx])
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
     return mesh
