@@ -15,3 +15,6 @@ __pycache__/
 *.py[cod]
 
 *code-workspace
+
+
+depricated/

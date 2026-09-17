@@ -1,2 +1,0 @@
-target,label_mode,n_features,model,direction_training_window,n_train,n_test,train_positive_rate,test_positive_rate,test_average_precision,test_n_positive,test_n_total,test_roc_auc,test_best_threshold,test_f1,test_precision,test_recall
-AR,intersection,512,logistic_l2_balanced,2020_train_only,8642982,8561058,0.04102611806897203,0.04389165451279503,0.5798953865699558,375759,8561058,0.9546921099787329,0.8964506469586271,0.5629111190362973,0.5263864861171904,0.6048823847199934
