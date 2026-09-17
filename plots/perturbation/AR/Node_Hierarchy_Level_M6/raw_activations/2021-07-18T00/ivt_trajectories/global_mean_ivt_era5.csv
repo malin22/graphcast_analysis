@@ -1,0 +1,21 @@
+source,lead_hours,forecast_valid_time,global_mean_ivt,era5_file
+ERA5,6.0,2021-07-18 06:00:00,192.30460063868478,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-18.nc
+ERA5,12.0,2021-07-18 12:00:00,191.50611411293048,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-18.nc
+ERA5,18.0,2021-07-18 18:00:00,191.9244216184438,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-18.nc
+ERA5,24.0,2021-07-19 00:00:00,192.24225086135397,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-19.nc
+ERA5,30.0,2021-07-19 06:00:00,193.03614334959124,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-19.nc
+ERA5,36.0,2021-07-19 12:00:00,191.94604502901115,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-19.nc
+ERA5,42.0,2021-07-19 18:00:00,191.01097105804192,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-19.nc
+ERA5,48.0,2021-07-20 00:00:00,191.09098977095744,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-20.nc
+ERA5,54.0,2021-07-20 06:00:00,192.29771766868774,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-20.nc
+ERA5,60.0,2021-07-20 12:00:00,191.6178579659406,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-20.nc
+ERA5,66.0,2021-07-20 18:00:00,192.48402557234812,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-20.nc
+ERA5,72.0,2021-07-21 00:00:00,193.19934785705817,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-21.nc
+ERA5,78.0,2021-07-21 06:00:00,196.76559082163462,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-21.nc
+ERA5,84.0,2021-07-21 12:00:00,196.6522273312085,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-21.nc
+ERA5,90.0,2021-07-21 18:00:00,197.5360056851596,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-21.nc
+ERA5,96.0,2021-07-22 00:00:00,198.65382600454842,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-22.nc
+ERA5,102.0,2021-07-22 06:00:00,201.92724769899309,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-22.nc
+ERA5,108.0,2021-07-22 12:00:00,201.7794001906839,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-22.nc
+ERA5,114.0,2021-07-22 18:00:00,202.10878650020445,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-22.nc
+ERA5,120.0,2021-07-23 00:00:00,202.32735204089633,/share/prj-4d/graphcast_shared/data/era5_daily_nc/era5_2021-07-23.nc
