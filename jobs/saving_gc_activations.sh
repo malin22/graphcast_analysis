@@ -22,6 +22,6 @@ source /home/student/s/sascholle/miniconda3/etc/profile.d/conda.sh
 conda activate graphcast312
 
 # Run your script
-srun python -u src/graphcast_setup.py
+srun python -u src/set_up/graphcast_setup.py
 
 echo "Finished at: $(date)"

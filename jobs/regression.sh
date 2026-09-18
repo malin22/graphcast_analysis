@@ -23,25 +23,25 @@ conda activate graphcast
 export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
 
 # Surface variables
-python -m malins_pca_experiments.run_surface_regression
+python -m regression.atmospheric_variables.experiments.run_surface_regression
 
 # Pressure-level variables
-python -m malins_pca_experiments.run_multilevel_regression \
+python -m regression.atmospheric_variables.experiments.run_multilevel_regression \
     --variable temperature
 
-python -m malins_pca_experiments.run_multilevel_regression \
+python -m regression.atmospheric_variables.experiments.run_multilevel_regression \
     --variable u_component_of_wind
 
-python -m malins_pca_experiments.run_multilevel_regression \
+python -m regression.atmospheric_variables.experiments.run_multilevel_regression \
     --variable v_component_of_wind
 
-python -m malins_pca_experiments.run_multilevel_regression \
+python -m regression.atmospheric_variables.experiments.run_multilevel_regression \
     --variable geopotential
 
-python -m malins_pca_experiments.run_multilevel_regression \
+python -m regression.atmospheric_variables.experiments.run_multilevel_regression \
     --variable specific_humidity
 
-python -m malins_pca_experiments.run_multilevel_regression \
+python -m regression.atmospheric_variables.experiments.run_multilevel_regression \
     --variable vertical_velocity
 
 echo "Finished at: $(date)"

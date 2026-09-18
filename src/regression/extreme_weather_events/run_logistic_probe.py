@@ -24,6 +24,127 @@ from preprocessing.mesh_context import (
     get_mesh_latlon,
 )
 
+def permute_event_masks(
+    y,
+    matched_df,
+    split_masks,
+    samples_per_t,
+    *,
+    seed,
+    matching="month",
+):
+    """
+    Permute complete ClimateNet masks between GraphCast timesteps.
+
+    Permutation is performed independently within train, validation,
+    and test, so labels never cross temporal split boundaries.
+
+    With matching="month", masks are only exchanged between events
+    from the same calendar month. This preserves broad seasonality
+    while destroying the event-specific GraphCast <-> ClimateNet
+    correspondence.
+
+    Returns
+    -------
+    y_permuted : np.ndarray
+        Flattened node-level labels in the same format as the
+        original y.
+
+    permutation_df : pd.DataFrame
+        Audit table describing which mask was assigned to each
+        GraphCast timestep.
+    """
+    if seed is None:
+        raise ValueError(
+            "permutation_seed must be provided when "
+            "permute_masks=True."
+        )
+
+    rng = np.random.default_rng(seed)
+
+    n_events = len(matched_df)
+
+    if len(y) != n_events * samples_per_t:
+        raise ValueError(
+            "Cannot reshape labels into event masks: "
+            f"len(y)={len(y)}, n_events={n_events}, "
+            f"samples_per_t={samples_per_t}."
+        )
+
+    # One row = one complete ClimateNet mask on GraphCast nodes.
+    y_events = y.reshape(n_events, samples_per_t)
+
+    # Start with a copy. Every event belonging to train/val/test
+    # will be overwritten below.
+    y_permuted = y_events.copy()
+
+    mapping_rows = []
+
+    split_names = ["train", "val", "test"]
+
+    for split_name in split_names:
+        event_mask = split_masks[f"event_{split_name}"]
+
+        if event_mask is None:
+            continue
+
+        split_indices = np.flatnonzero(event_mask)
+
+        if matching == "month":
+            months = pd.to_datetime(
+                matched_df.loc[
+                    split_indices,
+                    "graphcast_time",
+                ]
+            ).dt.month.to_numpy()
+
+            group_values = np.unique(months)
+
+            groups = [
+                split_indices[months == month]
+                for month in group_values
+            ]
+
+        elif matching == "none":
+            groups = [split_indices]
+
+        else:
+            raise ValueError(
+                f"Unknown permutation_matching={matching!r}. "
+                "Expected 'month' or 'none'."
+            )
+
+        for group_indices in groups:
+            n_group = len(group_indices)
+
+            if n_group < 2:
+                raise ValueError(
+                    "Cannot construct a non-self mask permutation "
+                    f"for a group containing only {n_group} event(s). "
+                    f"Split={split_name}, "
+                    f"matching={matching}."
+                )
+
+            # Random non-zero cyclic shift.
+            # Every timestep receives another timestep's complete mask.
+            shift = rng.integers(1, n_group)
+
+            source_indices = np.roll(
+                group_indices,
+                shift,
+            )
+
+            assert np.all(source_indices != group_indices)
+
+            y_permuted[group_indices] = y_events[source_indices]
+
+    permutation_df = pd.DataFrame(mapping_rows)
+
+    return (
+        y_permuted.reshape(-1),
+        permutation_df,
+    )
+
 
 def run_logistic_experiment(
     *,
@@ -48,6 +169,9 @@ def run_logistic_experiment(
     pc_scores_paths=None,
     timestep_files_txts=None,
     extra_metadata=None,
+    permute_masks=False,
+    permutation_seed=None,
+    permutation_matching="month",
 ):
     """
     Run one complete ClimateNet logistic-probe experiment.
@@ -217,6 +341,81 @@ def run_logistic_experiment(
         test_start=test_start,
         test_end=test_end,
     )
+
+    # ========================================================
+    # Optional null baseline:
+    # permute complete ClimateNet masks between timesteps
+    # ========================================================
+
+    permutation_df = None
+
+    if permute_masks:
+        y_original = y.copy()
+        y, permutation_df = permute_event_masks(
+            y,
+            matched_df,
+            split_masks,
+            samples_per_t,
+            seed=permutation_seed,
+            matching=permutation_matching,
+        )
+
+        permutation_path = os.path.join(
+            out_dir,
+            "mask_permutation.csv",
+        )
+
+        permutation_df.to_csv(
+            permutation_path,
+            index=False,
+        )
+
+        print()
+        print("=" * 80)
+        print("MASK-PERMUTATION NULL BASELINE")
+        print("=" * 80)
+        print("Seed:", permutation_seed)
+        print("Matching:", permutation_matching)
+        print("Saved permutation:", permutation_path)
+
+
+        # --------------------------------------------------------
+        # Sanity checks-delete me?
+        # --------------------------------------------------------
+
+        # Global number of positive node labels must be identical.
+        assert np.sum(y) == np.sum(y_original)
+
+        # And it must be identical separately within every split.
+        for split_name in ["train", "val", "test"]:
+            node_mask = split_masks[split_name]
+
+            if node_mask is None:
+                continue
+
+            original_positive = np.sum(
+                y_original[node_mask]
+            )
+            permuted_positive = np.sum(
+                y[node_mask]
+            )
+
+            assert original_positive == permuted_positive, (
+                f"Positive-label count changed in {split_name}: "
+                f"{original_positive} -> {permuted_positive}"
+            )
+
+        print("Permutation sanity checks passed.")
+        print(
+            "Original positive rate:",
+            float(np.mean(y_original)),
+        )
+        print(
+            "Permuted positive rate:",
+            float(np.mean(y)),
+        )
+
+        #----------------------
 
     y_train_all = y[
         split_masks["train"]
@@ -481,6 +680,10 @@ def run_logistic_experiment(
             "val_end": str(val_end),
             "test_start": str(test_start),
             "test_end": str(test_end),
+            # Null-baseline information
+            "permute_masks": permute_masks,
+            "permutation_seed": (permutation_seed if permute_masks else -1),
+            "permutation_matching": (permutation_matching if permute_masks else "none"),
         }
 
         if extra_metadata:
@@ -520,6 +723,10 @@ def run_logistic_experiment(
             "train_positive_rate": float(
                 np.mean(y_train)
             ),
+            # Null-baseline information
+            "permute_masks": permute_masks,
+            "permutation_seed": (permutation_seed if permute_masks else -1),
+            "permutation_matching": (permutation_matching if permute_masks else "none")
         }
 
         result.update(

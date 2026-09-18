@@ -19,6 +19,6 @@ source /home/student/m/mbraatz/miniconda/etc/profile.d/conda.sh
 conda activate graphcast
 
 # Run your script
-srun python -u src/data_setup.py
+srun python -u src/set_up/data_setup.py
 
 echo "Finished at: $(date)"
