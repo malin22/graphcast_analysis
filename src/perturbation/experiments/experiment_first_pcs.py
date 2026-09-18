@@ -223,16 +223,30 @@ def build_intervention() -> PerturbationDirection:
 
     # For the first-PC experiment, perturb along the same direction
     # as the converted logistic probe in raw activation space.
-    direction = probe_weight.copy()
+    direction_z = coef_z.copy()
 
-    norm = np.linalg.norm(direction)
+    norm_z = np.linalg.norm(direction_z)
 
-    if not np.isfinite(norm) or norm <= 0:
+    if not np.isfinite(norm_z) or norm_z <= 0:
         raise ValueError(
-            f"Invalid perturbation direction norm: {norm}"
+            f"Invalid standardized direction norm: {norm_z}"
         )
 
-    direction /= norm
+    direction_z /= norm_z
+
+    direction = (
+        scaler_scale * direction_z
+    ).astype(np.float32)
+
+    print(
+    "Standardized direction norm:",
+    np.linalg.norm(direction / scaler_scale),
+    )
+
+    print(
+        "Raw-space direction norm:",
+        np.linalg.norm(direction),
+    )
 
     # --------------------------------------------------------
     # Diagnostics

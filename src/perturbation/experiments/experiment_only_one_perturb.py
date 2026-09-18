@@ -180,16 +180,41 @@ def build_intervention() -> PerturbationDirection:
 
     # Perturb along the logistic-regression direction in the
     # original 512-D GraphCast activation space.
-    direction = probe_weight.copy()
+    #direction = probe_weight.copy()
 
-    norm = np.linalg.norm(direction)
+    #norm = np.linalg.norm(direction)
 
-    if not np.isfinite(norm) or norm <= 0:
+    #if not np.isfinite(norm) or norm <= 0:
+    #    raise ValueError(
+    #        f"Invalid perturbation direction norm: {norm}"
+    #    )
+
+    #direction /= norm
+
+    direction_z = coef_z.copy()
+
+    norm_z = np.linalg.norm(direction_z)
+
+    if not np.isfinite(norm_z) or norm_z <= 0:
         raise ValueError(
-            f"Invalid perturbation direction norm: {norm}"
+            f"Invalid standardized direction norm: {norm_z}"
         )
 
-    direction /= norm
+    direction_z /= norm_z
+
+    direction = (
+        scaler_scale * direction_z
+    ).astype(np.float32)
+
+    print(
+    "Standardized direction norm:",
+    np.linalg.norm(direction / scaler_scale),
+    )
+
+    print(
+        "Raw-space direction norm:",
+        np.linalg.norm(direction),
+    )
 
     # --------------------------------------------------------
     # Diagnostics
