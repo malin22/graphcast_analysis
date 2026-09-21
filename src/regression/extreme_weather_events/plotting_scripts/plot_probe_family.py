@@ -18,11 +18,11 @@ RESULTS_BASE = Path(
     f"Node_Hierarchy_Level_M{HIERARCHY_LEVEL}"
 )
 
-FOLDER = "without_l1"
+FOLDER = "with_baseline"
 
 
 PLOTS_DIR = Path(
-    f"plots/extreme_weather_events/"
+    f"plots/regression/extreme_weather_events/"
     f"{WEATHER_FEATURE}/"
     f"Node_Hierarchy_Level_M{HIERARCHY_LEVEL}/"
     f"probe_comparison/{FOLDER}/"
@@ -44,7 +44,7 @@ EXPERIMENTS = {
     "raw": {
         "include": True,
         "label": "Raw activations",
-        "kind": "baseline",
+        "kind": "line",
         "relative_path": f"raw_activations/logistic_probe_{WEATHER_FEATURE}_raw_activations_intersection_M6_max_3hour.csv",
     },
     "first_pcs": {
@@ -70,6 +70,12 @@ EXPERIMENTS = {
         "label": "L1-selected PCs + L2 probe",
         "kind": "point",
         "relative_path": f"l1_selected_pcs_l2_sweep/summary.csv",
+    },
+    "baseline_shuffled_days": {
+        "include": True,
+        "label": "baseline (shuffled days)",
+        "kind": "baseline",
+        "relative_path": f"permuted_masks_raw_activations/seed_42/logistic_probe_AR_permuted_masks_raw_activations_intersection_M6_max_3hour.csv",
     },
 }
 
@@ -209,6 +215,21 @@ def plot_metric(loaded, metric, ylabel, title, filename):
                 linestyle="--",
                 linewidth=1.5,
                 color="gray",
+                label=f"{label} ({n_features} dims)",
+            )
+            all_feature_counts.append(n_features)
+
+        elif kind == "line":
+            # A raw-activation experiment normally has one row.
+            # Treat it as a reference value across the whole plot.
+            raw_value = float(y[0])
+            n_features = int(x[0])
+
+            ax.axhline(
+                raw_value,
+                linestyle="--",
+                linewidth=1.5,
+                color="red",
                 label=f"{label} ({n_features} dims)",
             )
             all_feature_counts.append(n_features)

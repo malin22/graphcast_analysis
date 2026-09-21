@@ -5,7 +5,7 @@ import glob
 import pandas as pd
 
 
-WEATHER_FEATURE = "AR"
+WEATHER_FEATURE = "TC"
 MASK_DIR = (
     f"/share/prj-4d/graphcast_shared/data/"
     f"ClimateNetLarge/{WEATHER_FEATURE}_labels_cleaned"
@@ -16,7 +16,7 @@ END_DATE = "2021-12-31"
 
 MAX_DIFF_HOURS = 3
 
-OUT_CSV = f"good_{WEATHER_FEATURE}_starting_points_5day_masks.csv"
+#OUT_CSV = f"good_{WEATHER_FEATURE}_starting_points_5day_masks.csv"
 
 
 def load_mask_times(mask_dir):
@@ -62,7 +62,9 @@ def nearest_mask(mask_df, target_time):
 def main():
     mask_df = load_mask_times(MASK_DIR)
 
-    # Possible AR starting/center times
+    print(f"Loaded {len(mask_df)} masks from {MASK_DIR}")
+
+    # Possible starting/center times
     candidate_centers = pd.date_range(
         START_DATE,
         END_DATE,
@@ -73,7 +75,7 @@ def main():
 
     for center_time in candidate_centers:
 
-        # Times for which we want an AR mask
+        # Times for which we want a mask
         check_times = {
             "6h": center_time + pd.Timedelta(hours=6),
             "1d": center_time + pd.Timedelta(days=1),
@@ -128,10 +130,10 @@ def main():
 
     out = out.sort_values("center_time").reset_index(drop=True)
 
-    out.to_csv(OUT_CSV, index=False)
+    #out.to_csv(OUT_CSV, index=False)
 
     print(f"Found {len(out)} suitable center times.")
-    print(f"Saved: {OUT_CSV}")
+    #print(f"Saved: {OUT_CSV}")
     print()
 
     print(
