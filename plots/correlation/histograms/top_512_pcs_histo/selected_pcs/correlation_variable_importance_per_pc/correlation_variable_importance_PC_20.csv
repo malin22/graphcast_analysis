@@ -1,0 +1,89 @@
+feature,label,category,score
+geopotential_at_surface,Surface geopotential,Static/context,0.18516607
+position_context,Position context,Static/context,0.076951296
+land_sea_mask,Land-sea mask,Static/context,0.038339353
+local_time_context,Local time context,Static/context,0.065581024
+2m_temperature,2m temperature,Surface/single-level,0.061430106
+10m_u_component_of_wind,10m U wind,Surface/single-level,0.10759136
+10m_v_component_of_wind,10m V wind,Surface/single-level,0.044237282
+mean_sea_level_pressure,Mean sea-level pressure,Surface/single-level,0.044046513
+total_precipitation_6hr,Total precipitation 6h,Surface/single-level,0.031991219
+toa_incident_solar_radiation,TOA solar radiation,Surface/single-level,0.058865866
+geopotential_lev08,Geopotential 50 hPa,Geopotential,0.052591536
+geopotential_lev10,Geopotential 100 hPa,Geopotential,0.05623364
+geopotential_lev12,Geopotential 150 hPa,Geopotential,0.063019229
+geopotential_lev14,Geopotential 200 hPa,Geopotential,0.0680535
+geopotential_lev16,Geopotential 250 hPa,Geopotential,0.071929053
+geopotential_lev17,Geopotential 300 hPa,Geopotential,0.073703527
+geopotential_lev19,Geopotential 400 hPa,Geopotential,0.071947293
+geopotential_lev21,Geopotential 500 hPa,Geopotential,0.066423903
+geopotential_lev23,Geopotential 600 hPa,Geopotential,0.060497411
+geopotential_lev25,Geopotential 700 hPa,Geopotential,0.055903884
+geopotential_lev30,Geopotential 850 hPa,Geopotential,0.049232183
+geopotential_lev33,Geopotential 925 hPa,Geopotential,0.045475375
+geopotential_lev36,Geopotential 1000 hPa,Geopotential,0.042755784
+temperature_lev08,Temperature 50 hPa,Temperature,0.063356117
+temperature_lev10,Temperature 100 hPa,Temperature,0.076057769
+temperature_lev12,Temperature 150 hPa,Temperature,0.083487389
+temperature_lev14,Temperature 200 hPa,Temperature,0.073359006
+temperature_lev16,Temperature 250 hPa,Temperature,0.053230174
+temperature_lev17,Temperature 300 hPa,Temperature,0.065242259
+temperature_lev19,Temperature 400 hPa,Temperature,0.087718844
+temperature_lev21,Temperature 500 hPa,Temperature,0.091304789
+temperature_lev23,Temperature 600 hPa,Temperature,0.078718434
+temperature_lev25,Temperature 700 hPa,Temperature,0.060616579
+temperature_lev30,Temperature 850 hPa,Temperature,0.057699881
+temperature_lev33,Temperature 925 hPa,Temperature,0.055378911
+temperature_lev36,Temperature 1000 hPa,Temperature,0.057007361
+specific_humidity_lev08,Specific humidity 50 hPa,Specific humidity,0.066073099
+specific_humidity_lev10,Specific humidity 100 hPa,Specific humidity,0.069321847
+specific_humidity_lev12,Specific humidity 150 hPa,Specific humidity,0.098606061
+specific_humidity_lev14,Specific humidity 200 hPa,Specific humidity,0.10836796
+specific_humidity_lev16,Specific humidity 250 hPa,Specific humidity,0.11157036
+specific_humidity_lev17,Specific humidity 300 hPa,Specific humidity,0.12275347
+specific_humidity_lev19,Specific humidity 400 hPa,Specific humidity,0.15426364
+specific_humidity_lev21,Specific humidity 500 hPa,Specific humidity,0.15336905
+specific_humidity_lev23,Specific humidity 600 hPa,Specific humidity,0.14738007
+specific_humidity_lev25,Specific humidity 700 hPa,Specific humidity,0.1292194
+specific_humidity_lev30,Specific humidity 850 hPa,Specific humidity,0.07762385
+specific_humidity_lev33,Specific humidity 925 hPa,Specific humidity,0.07443587
+specific_humidity_lev36,Specific humidity 1000 hPa,Specific humidity,0.078415869
+u_component_of_wind_lev08,U wind 50 hPa,U wind,0.084147161
+u_component_of_wind_lev10,U wind 100 hPa,U wind,0.14022141
+u_component_of_wind_lev12,U wind 150 hPa,U wind,0.18969603
+u_component_of_wind_lev14,U wind 200 hPa,U wind,0.18481795
+u_component_of_wind_lev16,U wind 250 hPa,U wind,0.17193271
+u_component_of_wind_lev17,U wind 300 hPa,U wind,0.14887714
+u_component_of_wind_lev19,U wind 400 hPa,U wind,0.087095998
+u_component_of_wind_lev21,U wind 500 hPa,U wind,0.054972193
+u_component_of_wind_lev23,U wind 600 hPa,U wind,0.061355614
+u_component_of_wind_lev25,U wind 700 hPa,U wind,0.083826811
+u_component_of_wind_lev30,U wind 850 hPa,U wind,0.046435564
+u_component_of_wind_lev33,U wind 925 hPa,U wind,0.080545443
+u_component_of_wind_lev36,U wind 1000 hPa,U wind,0.10568819
+v_component_of_wind_lev08,V wind 50 hPa,V wind,0.033350925
+v_component_of_wind_lev10,V wind 100 hPa,V wind,0.053499195
+v_component_of_wind_lev12,V wind 150 hPa,V wind,0.06476289
+v_component_of_wind_lev14,V wind 200 hPa,V wind,0.0727541
+v_component_of_wind_lev16,V wind 250 hPa,V wind,0.072605936
+v_component_of_wind_lev17,V wind 300 hPa,V wind,0.07291355
+v_component_of_wind_lev19,V wind 400 hPa,V wind,0.072052558
+v_component_of_wind_lev21,V wind 500 hPa,V wind,0.072090519
+v_component_of_wind_lev23,V wind 600 hPa,V wind,0.068121064
+v_component_of_wind_lev25,V wind 700 hPa,V wind,0.04091903
+v_component_of_wind_lev30,V wind 850 hPa,V wind,0.049650525
+v_component_of_wind_lev33,V wind 925 hPa,V wind,0.037468716
+v_component_of_wind_lev36,V wind 1000 hPa,V wind,0.044855343
+vertical_velocity_lev08,Vertical velocity 50 hPa,Vertical velocity,0.017627716
+vertical_velocity_lev10,Vertical velocity 100 hPa,Vertical velocity,0.01713168
+vertical_velocity_lev12,Vertical velocity 150 hPa,Vertical velocity,0.022479903
+vertical_velocity_lev14,Vertical velocity 200 hPa,Vertical velocity,0.029488866
+vertical_velocity_lev16,Vertical velocity 250 hPa,Vertical velocity,0.036858529
+vertical_velocity_lev17,Vertical velocity 300 hPa,Vertical velocity,0.039300216
+vertical_velocity_lev19,Vertical velocity 400 hPa,Vertical velocity,0.044819304
+vertical_velocity_lev21,Vertical velocity 500 hPa,Vertical velocity,0.047790776
+vertical_velocity_lev23,Vertical velocity 600 hPa,Vertical velocity,0.048557914
+vertical_velocity_lev25,Vertical velocity 700 hPa,Vertical velocity,0.039132285
+vertical_velocity_lev30,Vertical velocity 850 hPa,Vertical velocity,0.024909484
+vertical_velocity_lev33,Vertical velocity 925 hPa,Vertical velocity,0.074245153
+vertical_velocity_lev36,Vertical velocity 1000 hPa,Vertical velocity,0.1065066
