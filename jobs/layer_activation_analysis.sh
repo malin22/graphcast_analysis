@@ -20,6 +20,6 @@ conda activate graphcast312
 
 # Run your script
 #srun python -u src/sabines_layer_experiments/save_all_layers.py
-#srun python -u src/sabines_layer_experiments/all_layers_animation.py
-srun python -u src/sabines_layer_experiments/pc_0_8_15_sidebyside_comparison.py
+srun python -u src/layers/all_layers_analysis.py --pca-mode per_layer
+#srun python -u src/sabines_layer_experiments/pc_0_8_15_sidebyside_comparison.py
 echo "Finished at: $(date)"

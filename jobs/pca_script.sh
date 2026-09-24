@@ -18,7 +18,7 @@ echo "Working directory: $(pwd)"
 source /home/student/s/sascholle/miniconda3/etc/profile.d/conda.sh
 conda activate graphcast312
 
-#srun python /home/student/s/sascholle/share/graphcast_analysis/src/pca_script.py
-srun python /home/student/s/sascholle/share/graphcast_analysis/src/layers/per_layer_pca_script.py
+srun python /home/student/s/sascholle/share/graphcast_analysis/src/set_up/pca_script.py
+#srun python /home/student/s/sascholle/share/graphcast_analysis/src/layers/per_layer_pca_script.py
 
 echo "Finished at: $(date)"
