@@ -25,6 +25,6 @@ conda activate graphcast312
 #srun python -u src/sabines_mapping_experiments/put_era5_on_node_mesh.py
 #srun python -u src/sabines_mapping_experiments/tensor_decomposition_subset.py
 #srun python -u src/sabines_mapping_experiments/helper_scripts/2020_vs_2021_bases_correlation_validation.py
-srun python -u src/correlation/helper_scripts/ocean_current_analysis.py
+srun python -u src/correlation/helper_scripts/ocean_current_analysis.py --plot-only
 
 echo "Finished at: $(date)"

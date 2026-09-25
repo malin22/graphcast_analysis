@@ -6,14 +6,11 @@ graphcast
 
 jobs/
 
-results/
-
 data/
 
 __pycache__/
 *.py[cod]
 
 *code-workspace
-
 
 depricated/
