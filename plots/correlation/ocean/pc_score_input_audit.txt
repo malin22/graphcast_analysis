@@ -1,0 +1,28 @@
+PC-score source files: 1453
+First timestamp: 2021-01-01T00:00:00
+Last timestamp:  2021-12-31T12:00:00
+Duplicate timestamps: 0
+Inferred nominal timestep: 6.00 hours
+Missing timestamps within observed date range: 6
+
+Rows per calendar month:
+  2021-01: 124
+  2021-02: 112
+  2021-03: 124
+  2021-04: 120
+  2021-05: 124
+  2021-06: 120
+  2021-07: 124
+  2021-08: 124
+  2021-09: 120
+  2021-10: 124
+  2021-11: 114
+  2021-12: 123
+
+Missing internal timestamps:
+  2021-11-22T18:00:00
+  2021-11-23T00:00:00
+  2021-11-23T06:00:00
+  2021-11-23T12:00:00
+  2021-11-23T18:00:00
+  2021-11-24T00:00:00

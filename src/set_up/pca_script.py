@@ -177,7 +177,7 @@ def plot_yearly_mean_pcs(
         pc_labels = range(1, n_top_pcs + 1)
 
     #npy_files = sorted(glob(os.path.join(acts_dir, "*.npy")))
-    pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t2021-*.npy"
+    pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t20*.npy"
     #pattern = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t2021-01-01T00.npy"
     npy_files = sorted(glob(os.path.join(acts_dir, pattern)))
 
@@ -296,6 +296,7 @@ def run_pca(
     batch_size: int = 10,
     out_dir: str = "/share/prj-4d/graphcast_shared/data/pca_components/", 
     output_tag: str = "2019_2020_layer8",
+    layer_pattern: str = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t2019*.npy",
 ):
     """
     Fit IncrementalPCA on activation files, skip files with NaNs, and plot top PCs.
@@ -309,7 +310,7 @@ def run_pca(
     os.makedirs(out_dir, exist_ok=True)
 
     # Find all .npy files
-    pattern = "layer00*_mesh_gnn_post_res_nodes_mesh_nodes_t2019*.npy"
+    pattern = layer_pattern
     npy_files = collect_activation_files(acts_dir, pattern)
 
     print(f"Found {len(npy_files)} activation files in total")
@@ -405,31 +406,40 @@ def run_pca(
     print("Cumulative explained variance:")
     print(np.cumsum(ipca.explained_variance_ratio_))
 
+    # Save for later plotting
+    variance_path = out_dir / f"{output_tag}_cumulative_explained_variance.npy"
+    np.save(np.cumsum(ipca.explained_variance_ratio_))
+
+    print(f"Saved cumulative explained variance to: {variance_path}")
+
+
 
     return ipca
 
 if __name__ == "__main__":
-    ACTS_DIR = "/share/prj-4d/graphcast_shared/data/graphcast_activations_all_layers_2019" #"/share/prj-4d/graphcast_shared/data/graphcast_activation_2021" # can also pass in a list for running ipca on multiple years
-    PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/all_layers"
+    ACTS_DIR = ["/share/prj-4d/graphcast_shared/data/graphcast_activation_2019", "/share/prj-4d/graphcast_shared/data/graphcast_activation_2020"]  # can also pass in a list for running ipca on multiple years
+    PCA_DIR = "/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/rerun_for_cumulative_explained_variance_plot"
+    LAYER_PATTERN = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t*.npy"
     #PLOTS_OUT    = "plots/2021_projected_on_2021"
 
-    # ipca = run_pca(
-    #     acts_dir=ACTS_DIR,
-    #     n_components=512,
-    #     batch_size=10,
-    #     out_dir=PCA_DIR,
-    #     output_tag="2019_all_layers",
+    ipca = run_pca(
+        acts_dir=ACTS_DIR,
+        n_components=512,
+        batch_size=10,
+        out_dir=PCA_DIR,
+        output_tag="2019_2020_layer8",
+        layer_pattern=LAYER_PATTERN
   
-    # )
+    )
     
 
-    plot_yearly_mean_pcs(
-        acts_dir="/share/prj-4d/graphcast_shared/data/graphcast_activation_2021",
-        pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2019_2020_layer8.npy',
-        pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2019_2020_layer8.npy',
-        out_dir="plots/2019_2020_pca_projected_on_2021/Jan1_plot",
-        n_top_pcs=1,
-        use_last_pcs=False,
-        scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
-        add_world_map=False,
-    )
+    # plot_yearly_mean_pcs(
+    #     acts_dir="/share/prj-4d/graphcast_shared/data/graphcast_activation_2021",
+    #     pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2019_2020_layer8.npy',
+    #     pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2019_2020_layer8.npy',
+    #     out_dir="plots/2019_2020_pca_projected_on_2021/Jan1_plot",
+    #     n_top_pcs=1,
+    #     use_last_pcs=False,
+    #     scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
+    #     add_world_map=False,
+    # )
