@@ -422,24 +422,24 @@ if __name__ == "__main__":
     LAYER_PATTERN = "layer0008_mesh_gnn_post_res_nodes_mesh_nodes_t*.npy"
     #PLOTS_OUT    = "plots/2021_projected_on_2021"
 
-    ipca = run_pca(
-        acts_dir=ACTS_DIR,
-        n_components=512,
-        batch_size=10,
-        out_dir=PCA_DIR,
-        output_tag="2019_2020_layer8",
-        layer_pattern=LAYER_PATTERN
+    # ipca = run_pca(
+    #     acts_dir=ACTS_DIR,
+    #     n_components=512,
+    #     batch_size=10,
+    #     out_dir=PCA_DIR,
+    #     output_tag="2019_2020_layer8",
+    #     layer_pattern=LAYER_PATTERN
   
-    )
+    # )
     
 
-    # plot_yearly_mean_pcs(
-    #     acts_dir="/share/prj-4d/graphcast_shared/data/graphcast_activation_2021",
-    #     pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2019_2020_layer8.npy',
-    #     pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2019_2020_layer8.npy',
-    #     out_dir="plots/2019_2020_pca_projected_on_2021/Jan1_plot",
-    #     n_top_pcs=1,
-    #     use_last_pcs=False,
-    #     scramble_activations=False, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
-    #     add_world_map=False,
-    # )
+    plot_yearly_mean_pcs(
+        acts_dir="/share/prj-4d/graphcast_shared/data/graphcast_activation_2021",
+        pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2019_2020_layer8.npy',
+        pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2019_2020_layer8.npy',
+        out_dir="plots/pc_activation_maps/2019_2020_pca_projected_on_2021/scrambled_baseline",
+        n_top_pcs=3,
+        use_last_pcs=False,
+        scramble_activations=True, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
+        add_world_map=False,
+    )

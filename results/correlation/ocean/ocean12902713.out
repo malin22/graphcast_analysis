@@ -1,0 +1,24 @@
+Running on node: hpc3-1
+Start time: Wed Sep 23 09:42:25 CEST 2026
+Working directory: /share/users/student/s/sascholle/graphcast_analysis
+PC-score array shape: (1453, 40962, 512)
+Using PC2
+Wrote PC-score audit: /share/prj-4d/graphcast_shared/data/glorys/outdata/pc2_glorys_thetao_metrics_2021/pc_score_input_audit.txt
+Loaded GLORYS month 01: /share/prj-4d/graphcast_shared/data/glorys/thetao_2021_monthly/glorys12_thetao_2021_01.nc
+Loaded GLORYS month 02: /share/prj-4d/graphcast_shared/data/glorys/thetao_2021_monthly/glorys12_thetao_2021_02.nc
+Loaded GLORYS month 03: /share/prj-4d/graphcast_shared/data/glorys/thetao_2021_monthly/glorys12_thetao_2021_03.nc
+Loaded GLORYS month 04: /share/prj-4d/graphcast_shared/data/glorys/thetao_2021_monthly/glorys12_thetao_2021_04.nc
+Loaded GLORYS month 05: /share/prj-4d/graphcast_shared/data/glorys/thetao_2021_monthly/glorys12_thetao_2021_05.nc
+Loaded GLORYS month 06: /share/prj-4d/graphcast_shared/data/glorys/thetao_2021_monthly/glorys12_thetao_2021_06.nc
+Loaded GLORYS month 07: /share/prj-4d/graphcast_shared/data/glorys/thetao_2021_monthly/glorys12_thetao_2021_07.nc
+Loaded GLORYS month 08: /share/prj-4d/graphcast_shared/data/glorys/thetao_2021_monthly/glorys12_thetao_2021_08.nc
+Loaded GLORYS month 09: /share/prj-4d/graphcast_shared/data/glorys/thetao_2021_monthly/glorys12_thetao_2021_09.nc
+Loaded GLORYS month 10: /share/prj-4d/graphcast_shared/data/glorys/thetao_2021_monthly/glorys12_thetao_2021_10.nc
+Loaded GLORYS month 11: /share/prj-4d/graphcast_shared/data/glorys/thetao_2021_monthly/glorys12_thetao_2021_11.nc
+Loaded GLORYS month 12: /share/prj-4d/graphcast_shared/data/glorys/thetao_2021_monthly/glorys12_thetao_2021_12.nc
+Saved reusable plotting cache: /share/prj-4d/graphcast_shared/data/glorys/outdata/pc2_glorys_thetao_metrics_2021/cached_pc2_glorys_2021_plot_data.npz
+
+Annual PC2 vs raw surface thetao: r = 0.1016
+Annual PC2 vs zonal thetao anomaly: r = 0.5361
+Saved metrics: /share/prj-4d/graphcast_shared/data/glorys/outdata/pc2_glorys_thetao_metrics_2021/pc2_glorys_thetao_metrics_2021.csv
+Finished at: Wed Sep 23 09:51:04 CEST 2026

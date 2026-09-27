@@ -12,7 +12,7 @@ PCA_COMPONENTS_PATH = Path("/share/prj-4d/graphcast_shared/data/pca_components/5
 PCA_MEAN_PATH = Path("/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2019_2020_layer8.npy")
 
 DEFAULT_ACTIVATION_TEMPLATE = "/share/prj-4d/graphcast_shared/data/graphcast_activation_{year}"
-DEFAULT_OUTPUT_DIR = Path("plots/sabines_experiments/temporality_analysis/pc_seasonal_similarity/test_with_colourgradient")
+DEFAULT_OUTPUT_DIR = Path("plots/temporality/pc_seasonal_similarity/")
 
 
 def to_float32(x) -> np.ndarray:
@@ -285,7 +285,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Compute circular PC spatial-pattern recurrence."
     )
-    parser.add_argument("--years", type=int, nargs="+", default=[2019, 2020, 2021])
+    parser.add_argument("--years", type=int, nargs="+", default=[2020, 2021])
     parser.add_argument("--activation-template", default=DEFAULT_ACTIVATION_TEMPLATE)
     parser.add_argument("--pc-indices", type=int, nargs="+", default=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     parser.add_argument("--max-lag-days", type=int, default=730)

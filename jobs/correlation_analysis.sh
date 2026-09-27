@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=ocean
+#SBATCH --job-name=dropoff
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=64G
-#SBATCH --output=logs/ocean%j.out
-#SBATCH --error=logs/ocean%j.err
+#SBATCH --output=logs/dropoff%j.out
+#SBATCH --error=logs/dropoff%j.err
 
 set -euo pipefail
 
@@ -25,6 +25,7 @@ conda activate graphcast312
 #srun python -u src/sabines_mapping_experiments/put_era5_on_node_mesh.py
 #srun python -u src/sabines_mapping_experiments/tensor_decomposition_subset.py
 #srun python -u src/sabines_mapping_experiments/helper_scripts/2020_vs_2021_bases_correlation_validation.py
-srun python -u src/correlation/helper_scripts/ocean_current_analysis.py --plot-only
+#srun python -u src/correlation/helper_scripts/ocean_current_analysis.py --plot-only
+srun python -u src/correlation/helper_scripts/pc_correlation_and_regression_dropoff_diagnostics.py
 
 echo "Finished at: $(date)"

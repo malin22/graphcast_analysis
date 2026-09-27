@@ -21,12 +21,11 @@ python pc_correlation_and_regression_dropoff_diagnostics.py \
 #DEFAULT_INPUT = Path("/home/student/s/sascholle/share/graphcast_analysis/plots/sabines_experiments/mapping_experiments/top_512_pcs/regression_pc_era5_mesh_m6_allvars_linear_results.json")
 
 DEFAULT_INPUT = Path(
-    "/home/student/s/sascholle/share/graphcast_analysis/plots/sabines_experiments/"
-    "mapping_experiments/top_512_pcs/correlation_pc_era5_mesh_m6_screening_cache.json"
+    "results/correlation/correlation_pc_era5_mesh_m6_screening_cache.json"
 )
 
 
-DEFAULT_OUTPUT = Path("/home/student/s/sascholle/share/graphcast_analysis/plots/sabines_experiments/mapping_experiments/top_512_pcs/dropoff_diagnostics")
+DEFAULT_OUTPUT = Path("plots/correlation/dropoff_diagnostics")
 
 
 def pc_sort_key(pc_name):
@@ -257,50 +256,60 @@ def plot_pc_dropoff(rows, output_path, rolling_window=15, thresholds=(0.2, 0.3, 
     top2 = np.asarray([r["top2_mean_abs_r"] for r in rows], dtype=float)
     top3 = np.asarray([r["top3_mean_abs_r"] for r in rows], dtype=float)
 
-    plt.figure(figsize=(16, 6))
+    fig, ax = plt.subplots(figsize=(16, 7.5))
 
-    plt.plot(pc_indices, top1, linewidth=1.2, alpha=0.9, label="Top 1")
-    plt.plot(pc_indices, top2, linewidth=1.0, alpha=0.65, label="Top 2")
-    plt.plot(pc_indices, top3, linewidth=1.0, alpha=0.65, label="Top 3")
+    ax.plot(pc_indices, top1, linewidth=1.4, alpha=0.9, label="Top 1")
+    ax.plot(pc_indices, top2, linewidth=1.2, alpha=0.65, label="Top 2")
+    ax.plot(pc_indices, top3, linewidth=1.2, alpha=0.65, label="Top 3")
 
-    plt.plot(
+    ax.plot(
         pc_indices,
         rolling_mean(top1, rolling_window),
         color="black",
-        linewidth=2.2,
+        linewidth=2.5,
         label=f"Top 1 rolling mean ({rolling_window})",
     )
 
     for threshold in thresholds:
-        plt.axhline(
+        ax.axhline(
             threshold,
             color="gray",
             linestyle="--",
-            linewidth=0.9,
+            linewidth=1.1,
             alpha=0.55,
         )
-        plt.text(
+        ax.text(
             pc_indices[-1] + 3,
             threshold,
             f"{threshold:.2f}",
             va="center",
-            fontsize=9,
+            fontsize=13,
             color="gray",
         )
 
-    plt.xlabel("PC index")
-    plt.ylabel("Mean absolute spatial Pearson r")
-    plt.title("Top ERA5 correlation strength across PCA components")
-    plt.ylim(0, min(1.0, np.nanmax(top1) * 1.12))
-    plt.xlim(pc_indices[0], pc_indices[-1] + 25)
-    plt.grid(alpha=0.25)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches="tight")
-    plt.close()
+    ax.set_xlabel("PC index", fontsize=20, labelpad=12)
+    ax.set_ylabel(
+        "Mean absolute spatial Pearson $r$",
+        fontsize=20,
+        labelpad=12,
+    )
+    ax.set_title(
+        "Top ERA5 correlation strength across PCA components",
+        fontsize=26,
+        pad=18,
+    )
+
+    ax.set_ylim(0, min(1.0, np.nanmax(top1) * 1.12))
+    ax.set_xlim(pc_indices[0], pc_indices[-1] + 25)
+    ax.tick_params(axis="both", labelsize=16)
+    ax.grid(alpha=0.25)
+    ax.legend(fontsize=15)
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
 
     print(f"Saved {output_path}")
-
 
 def plot_histogram(rows, output_path, bins=40):
     top1 = np.asarray([r["top1_mean_abs_r"] for r in rows], dtype=float)
