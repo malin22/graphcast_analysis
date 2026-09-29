@@ -3,7 +3,7 @@
 In this repo we provide the code for investigating the internal latent activations of GraphCast using principal component analysis (PCA) applied to the processor-layer embeddings across multi-year global forecasts. By projecting latent activations onto principal component directions, we can construct an unsupervised basis capturing the dominant directions of variation in the latent representation. We use this basis to test how global atmospheric information is organised within the representation and how much of it is retained in progressively lower-dimensional subspaces. We then extend this analysis to extreme-weather phenomena, testing whether such events can be identified from compact subsets of the latent representation of GraphCast. Finally, we move beyond association and decodability by intervening directly on selected latent directions and evaluating whether these interventions produce systematic changes in forecasts of atmospheric rivers (ARs) and tropical cyclones (TCs).
 
 ## Repository Structure
-
+```text
 graphcast_analysis/
 ├── README.md
 ├── requirements.txt
@@ -31,12 +31,13 @@ graphcast_analysis/
 │   └── ...
 │
 ├── logs/                              # HPC output and error logs
-
+```
 
 ### Data Directory
 
 The data directory contains GraphCast latent activations, ERA5 and ocean data, PCA outputs, event labels, and derived datasets used by the analysis scripts.
 
+```text
 data/                                      # Local/shared analysis data
 ├── ClimateNetLarge/                       # Extreme-weather event labels
 │   ├── AR_labels_cleaned/                 # Atmospheric river labels
@@ -60,3 +61,5 @@ data/                                      # Local/shared analysis data
 │
 └── deprecated_data/                         # Older or superseded datasets
     └── ...
+
+```
