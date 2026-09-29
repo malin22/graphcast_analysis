@@ -24,13 +24,12 @@ graphcast_analysis/
 │   └── deprecated/                    # Older or unused scripts
 │
 ├── plots/                             # Generated figures
-│   ├── baselines/
+│   ├── regression/
 │   └── ...
 │
-├── results/                           # Generated numerical results
+├── results/                           # Generated numerical results (not pushed!)
 │   └── ...
 │
-├── logs/                              # HPC output and error logs
 ```
 
 ### Data Directory
