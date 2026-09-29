@@ -1,5 +1,3 @@
-"""Atmospheric-river evaluation for GraphCast perturbation experiments."""
-
 import os
 
 import numpy as np

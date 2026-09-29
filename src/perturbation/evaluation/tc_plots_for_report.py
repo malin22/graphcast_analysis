@@ -40,9 +40,6 @@ TC_RADIUS_KM = 300.0
 TRACK_SEARCH_RADIUS_KM = 300.0
 EARTH_RADIUS_KM = 6371.0
 
-# ClimateNet inside/outside comparison. If None, "outside" means the full
-# forecast domain outside the selected TC mask, matching the AR script logic.
-# Set e.g. 700.0 to compare the TC mask against a local environmental annulus.
 MASK_OUTSIDE_RADIUS_KM = 1000.0
 BASE_DIR = os.path.join(
     "results", "perturbation", WEATHER_FEATURE,

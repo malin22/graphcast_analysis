@@ -1,18 +1,3 @@
-"""Publication-ready AR perturbation figures for the GraphCast report.
-
-Produces two core figures:
-  Figure 1: spatial ΔIVT maps for negative/positive perturbations at early,
-            middle, and late lead times, with ClimateNet contours where available.
-  Figure 2: immediate (+6 h) AR-mask dose response plus the absolute global
-            mean IVT trajectories, with gamma=0 shown as the baseline.
-
-Each composite figure is also exported as separate panel PNGs for flexible
-assembly in LaTeX.
-
-The script intentionally keeps the report figures selective. Diagnostic plots,
-videos, precipitation metrics, etc. remain in evaluate_ar.py.
-"""
-
 import os
 import glob
 from contextlib import closing

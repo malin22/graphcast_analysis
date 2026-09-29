@@ -1,5 +1,3 @@
-"""Tropical-cyclone tracking and intensity evaluation."""
-
 import os
 
 import numpy as np

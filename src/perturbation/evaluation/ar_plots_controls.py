@@ -1,15 +1,3 @@
-"""
-Compare AR perturbation controls.
-
-Plots global mean IVT trajectories for:
-    1. Correct event-aligned AR probe, gamma = 0.5
-    2. Shuffled-day / permuted-mask probe, gamma = 0.5
-    3. Random-label probe, gamma = 0.5
-    4. Unperturbed baseline, gamma = 0
-
-All trajectories use the same initialization time.
-"""
-
 import os
 
 import numpy as np
