@@ -438,7 +438,7 @@ if __name__ == "__main__":
         pca_components_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_components_2019_2020_layer8.npy',
         pca_mean_path='/share/prj-4d/graphcast_shared/data/pca_components/512_PCs/layer8_only/pca_mean_2019_2020_layer8.npy',
         out_dir="plots/pc_activation_maps/2019_2020_pca_projected_on_2021/scrambled_baseline",
-        n_top_pcs=3,
+        n_top_pcs=10,
         use_last_pcs=False,
         scramble_activations=True, # Set to True to scramble activations before projection -> should yield no meaningful spatial patterns in the PC maps, confirming that the original patterns are not artifacts of the PCA basis alone.
         add_world_map=False,
