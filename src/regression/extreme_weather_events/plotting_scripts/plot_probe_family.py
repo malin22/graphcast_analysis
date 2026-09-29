@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "AR"          # "TC" or "AR"
+WEATHER_FEATURE = "TC"          # "TC" or "AR"
 HIERARCHY_LEVEL = 6
 
 RESULTS_BASE = Path(
@@ -18,7 +18,7 @@ RESULTS_BASE = Path(
     f"Node_Hierarchy_Level_M{HIERARCHY_LEVEL}"
 )
 
-FOLDER = "with_baseline"
+FOLDER = "without_l1"
 
 
 PLOTS_DIR = Path(
@@ -30,51 +30,52 @@ PLOTS_DIR = Path(
 PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# Choose which experiment families appear in the plots.
-# Set include=False to hide one.
-#
-# "kind":
-#   "curve"    -> results contain several feature counts
-#   "baseline" -> one horizontal reference line
-#   "point"    -> one result at its actual selected feature count
-#
-# Update "relative_path" if one of your experiment runners writes
-# its summary CSV under a slightly different filename.
+
+
+cmap = plt.get_cmap("Set2", 4)  
+
 EXPERIMENTS = {
     "raw": {
         "include": True,
         "label": "Raw activations",
         "kind": "line",
+        "color": "firebrick",
         "relative_path": f"raw_activations/logistic_probe_{WEATHER_FEATURE}_raw_activations_intersection_M6_max_3hour.csv",
-    },
-    "first_pcs": {
-        "include": True,
-        "label": "First-k PCs",
-        "kind": "curve",
-        "relative_path": f"first_k_pcs/logistic_probe_{WEATHER_FEATURE}_first_k_pcs_intersection_M6_max_3hour.csv",
-    },
-    "selected_pcs": {
-        "include": True,
-        "label": "Coefficient-selected PCs",
-        "kind": "curve",
-        "relative_path": f"selected_pcs_after_coefs/logistic_probe_{WEATHER_FEATURE}_selected_pcs_after_coefs_intersection_M6_max_3hour.csv",
     },
     "selected_raw": {
         "include": True,
         "label": "Coefficient-selected activations",
         "kind": "curve",
+        "color": cmap(2),
         "relative_path": f"selected_raw_acts_after_coefs/logistic_probe_{WEATHER_FEATURE}_selected_raw_acts_after_coefs_intersection_M6_max_3hour.csv",
+    },
+    "selected_pcs": {
+        "include": True,
+        "label": "Coefficient-selected PCs",
+        "kind": "curve",
+        "color": cmap(1),
+        "relative_path": f"selected_pcs_after_coefs/logistic_probe_{WEATHER_FEATURE}_selected_pcs_after_coefs_intersection_M6_max_3hour.csv",
+    },
+
+        "first_pcs": {
+        "include": True,
+        "label": "First-k PCs",
+        "kind": "curve",
+        "color": cmap(0),
+        "relative_path": f"first_k_pcs/logistic_probe_{WEATHER_FEATURE}_first_k_pcs_intersection_M6_max_3hour.csv",
     },
     "l1_selected_pcs": {
         "include": False,
         "label": "L1-selected PCs + L2 probe",
         "kind": "point",
+        "color": cmap(3),
         "relative_path": f"l1_selected_pcs_l2_sweep/summary.csv",
     },
     "baseline_shuffled_days": {
-        "include": True,
+        "include": False,
         "label": "baseline (shuffled days)",
         "kind": "baseline",
+        "color": cmap(4),
         "relative_path": f"permuted_masks_raw_activations/seed_42/logistic_probe_AR_permuted_masks_raw_activations_intersection_M6_max_3hour.csv",
     },
 }
@@ -84,17 +85,17 @@ METRICS = {
     "test_average_precision": {
         "ylabel": "Average Precision (AP)",
         "title": "Average Precision",
-        "filename": "average_precision_vs_features.png",
+        "filename": f"{WEATHER_FEATURE}_average_precision_vs_features.png",
     },
     "test_roc_auc": {
         "ylabel": "ROC-AUC",
         "title": "ROC-AUC",
-        "filename": "roc_auc_vs_features.png",
+        "filename": f"{WEATHER_FEATURE}_roc_auc_vs_features.png",
     },
     "test_f1": {
         "ylabel": "F1 score",
         "title": "F1 score",
-        "filename": f"f1_vs_features_{WEATHER_FEATURE}.png",
+        "filename": f"{WEATHER_FEATURE}_f1_vs_features.png",
     },
 }
 
@@ -203,6 +204,7 @@ def plot_metric(loaded, metric, ylabel, title, filename):
 
         kind = experiment["kind"]
         label = experiment["label"]
+        color = experiment["color"]
 
         if kind == "baseline":
             # A raw-activation experiment normally has one row.
@@ -229,7 +231,7 @@ def plot_metric(loaded, metric, ylabel, title, filename):
                 raw_value,
                 linestyle="--",
                 linewidth=1.5,
-                color="red",
+                color=color,
                 label=f"{label} ({n_features} dims)",
             )
             all_feature_counts.append(n_features)
@@ -245,6 +247,7 @@ def plot_metric(loaded, metric, ylabel, title, filename):
             )
             all_feature_counts.extend(x.tolist())
 
+    
         elif kind == "curve":
             ax.plot(
                 x,
@@ -253,6 +256,7 @@ def plot_metric(loaded, metric, ylabel, title, filename):
                 linewidth=1.5,
                 markersize=4,
                 label=label,
+                color=color,
             )
             all_feature_counts.extend(x.tolist())
 
@@ -282,14 +286,15 @@ def plot_metric(loaded, metric, ylabel, title, filename):
         ax.set_xticks(tick_counts)
         ax.set_xticklabels([str(x) for x in tick_counts])
 
-    ax.set_xlabel("Number of features")
-    ax.set_ylabel(ylabel)
+    ax.set_xlabel("Number of features", fontsize=13)
+    ax.set_ylabel(ylabel, fontsize=13)
+    ax.tick_params(axis="both", labelsize=11)
 
     if WEATHER_FEATURE == "TC":
-        title = f"Tropical Cyclone — {title}"
+        title = ""#f"Tropical Cyclone" #— {title}"
     elif WEATHER_FEATURE == "AR":
-        title = f"Atmospheric River — {title}"
-    ax.set_title(title)
+        title = ""#f"Atmospheric River" #— {title}"
+    ax.set_title(title, fontsize=25)
     ax.grid(True, alpha=0.3)
     ax.legend()
 

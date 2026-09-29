@@ -10,15 +10,15 @@ from perturbation.run_perturbation import run_perturbation
 # EXPERIMENT CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "TC"
+WEATHER_FEATURE = "AR"
 NODE_HIERARCHY_LEVEL = 6
 
 THRESHOLD = 0.0
 
-START_TIME = "2021-05-24T18"
+START_TIME = "2021-10-28T00"
 
 
-EXPERIMENT_NAME = "raw_activations"
+EXPERIMENT_NAME = "raw_activations_with_threshold"
 
 
 # ============================================================

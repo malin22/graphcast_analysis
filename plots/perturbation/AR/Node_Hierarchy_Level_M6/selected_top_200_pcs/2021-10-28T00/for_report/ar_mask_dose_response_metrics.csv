@@ -1,0 +1,22 @@
+gamma,time_index,lead_hours,forecast_valid_time,mask_time,mask_time_diff_h,mask_file,delta_ivt_inside_mask_mean,delta_ivt_outside_mask_mean
+-1.0,0,6.0,2021-10-28 06:00:00,2021-10-28 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-28T05:00:00.000000000.nc,-30.1428041717318,-2.104325112076337
+-0.5,0,6.0,2021-10-28 06:00:00,2021-10-28 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-28T05:00:00.000000000.nc,-15.269653952840674,-1.069596472509903
+-0.2,0,6.0,2021-10-28 06:00:00,2021-10-28 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-28T05:00:00.000000000.nc,-6.149246554286467,-0.43235412342132945
+0.0,0,6.0,2021-10-28 06:00:00,2021-10-28 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-28T05:00:00.000000000.nc,0.0,0.0
+0.2,0,6.0,2021-10-28 06:00:00,2021-10-28 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-28T05:00:00.000000000.nc,6.1877744856132635,0.439475999447399
+0.5,0,6.0,2021-10-28 06:00:00,2021-10-28 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-28T05:00:00.000000000.nc,15.614089182332744,1.1036943614686172
+1.0,0,6.0,2021-10-28 06:00:00,2021-10-28 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-28T05:00:00.000000000.nc,31.49361857402455,2.238220560014461
+-1.0,8,54.0,2021-10-30 06:00:00,2021-10-30 07:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-30T07:00:00.000000000.nc,-95.86535070291507,-6.0517491802284376
+-0.5,8,54.0,2021-10-30 06:00:00,2021-10-30 07:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-30T07:00:00.000000000.nc,-51.33650552249688,-3.6425062378896516
+-0.2,8,54.0,2021-10-30 06:00:00,2021-10-30 07:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-30T07:00:00.000000000.nc,-20.974825710989343,-1.6275614443932063
+0.0,8,54.0,2021-10-30 06:00:00,2021-10-30 07:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-30T07:00:00.000000000.nc,0.0,0.0
+0.2,8,54.0,2021-10-30 06:00:00,2021-10-30 07:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-30T07:00:00.000000000.nc,21.060282252786404,1.9513142268599235
+0.5,8,54.0,2021-10-30 06:00:00,2021-10-30 07:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-30T07:00:00.000000000.nc,52.871047243717555,5.574411592033007
+1.0,8,54.0,2021-10-30 06:00:00,2021-10-30 07:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-10-30T07:00:00.000000000.nc,105.00127000759795,13.465985830675928
+-1.0,16,102.0,2021-11-01 06:00:00,2021-11-01 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-11-01T05:00:00.000000000.nc,-103.14043380699617,-8.91077211567717
+-0.5,16,102.0,2021-11-01 06:00:00,2021-11-01 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-11-01T05:00:00.000000000.nc,-44.98545600993402,-5.898542214170328
+-0.2,16,102.0,2021-11-01 06:00:00,2021-11-01 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-11-01T05:00:00.000000000.nc,-13.477424500107295,-2.924153211813002
+0.0,16,102.0,2021-11-01 06:00:00,2021-11-01 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-11-01T05:00:00.000000000.nc,0.0,0.0
+0.2,16,102.0,2021-11-01 06:00:00,2021-11-01 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-11-01T05:00:00.000000000.nc,8.288442837441924,3.626924932869046
+0.5,16,102.0,2021-11-01 06:00:00,2021-11-01 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-11-01T05:00:00.000000000.nc,14.700376324710067,10.505888584963163
+1.0,16,102.0,2021-11-01 06:00:00,2021-11-01 05:00:00,1.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-11-01T05:00:00.000000000.nc,22.31156828744064,25.716466295523347
