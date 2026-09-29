@@ -1,5 +1,4 @@
-graphcast @ git+https://github.com/theodoremacmillan/graphcast.git@a64f7934a7ea58549f45279808d01c04ab5de106
-
+graphcast @ git+https://github.com/malin22/graphcast.git@8d1a21b0f9b238de24e7e8d265cccbab7fb98c08
 jax==0.4.38
 jaxlib==0.4.38
 dm-haiku==0.0.14
