@@ -1,0 +1,6 @@
+time_index,lead_hours,forecast_valid_time,climatenet_mask_time,time_difference_hours,mask_file
+0,6.0,2021-07-18 06:00:00,2021-07-18 08:00:00,2.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-07-18T08:00:00.000000000.nc
+2,18.0,2021-07-18 18:00:00,2021-07-18 21:00:00,3.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-07-18T21:00:00.000000000.nc
+11,72.0,2021-07-21 00:00:00,2021-07-20 22:00:00,2.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-07-20T22:00:00.000000000.nc
+12,78.0,2021-07-21 06:00:00,2021-07-21 03:00:00,3.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-07-21T03:00:00.000000000.nc
+19,120.0,2021-07-23 00:00:00,2021-07-23 00:00:00,0.0,/share/prj-4d/graphcast_shared/data/ClimateNetLarge/AR_labels_cleaned/2021-07-23T00:00:00.000000000.nc

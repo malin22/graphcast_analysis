@@ -24,6 +24,65 @@ from preprocessing.mesh_context import (
     get_mesh_latlon,
 )
 
+def permute_node_labels(
+    y,
+    split_masks,
+    *,
+    seed,
+):
+    """
+    Randomly permute individual node labels independently within
+    train, validation, and test splits.
+
+    This preserves the exact positive-label count within each split,
+    while destroying the correspondence between GraphCast activation
+    vectors and ClimateNet labels.
+
+    Parameters
+    ----------
+    y : np.ndarray
+        Flattened node-level binary labels.
+
+    split_masks : dict
+        Output of build_split_masks().
+
+    seed : int
+        Random seed.
+
+    Returns
+    -------
+    y_permuted : np.ndarray
+        Randomized node-level labels.
+    """
+
+    if seed is None:
+        raise ValueError(
+            "random_label_seed must be provided when "
+            "randomize_labels=True."
+        )
+
+    rng = np.random.default_rng(seed)
+
+    y_permuted = y.copy()
+
+    for split_name in ["train", "val", "test"]:
+
+        node_mask = split_masks[split_name]
+
+        if node_mask is None:
+            continue
+
+        split_indices = np.flatnonzero(node_mask)
+
+        # Permute individual node labels within this split.
+        shuffled_labels = rng.permutation(
+            y[split_indices]
+        )
+
+        y_permuted[split_indices] = shuffled_labels
+
+    return y_permuted
+
 def permute_event_masks(
     y,
     matched_df,
@@ -172,6 +231,9 @@ def run_logistic_experiment(
     permute_masks=False,
     permutation_seed=None,
     permutation_matching="month",
+
+    randomize_labels=False,
+    random_label_seed=None,
 ):
     """
     Run one complete ClimateNet logistic-probe experiment.
@@ -416,6 +478,72 @@ def run_logistic_experiment(
         )
 
         #----------------------
+
+    # ========================================================
+    # Optional null baseline:
+    # randomly permute individual node labels
+    # ========================================================
+
+    if randomize_labels:
+
+        if permute_masks:
+            raise ValueError(
+                "permute_masks and randomize_labels should not "
+                "both be True in the same experiment."
+            )
+
+        y_original = y.copy()
+
+        y = permute_node_labels(
+            y,
+            split_masks,
+            seed=random_label_seed,
+        )
+
+        print()
+        print("=" * 80)
+        print("RANDOM-LABEL NULL BASELINE")
+        print("=" * 80)
+        print("Seed:", random_label_seed)
+
+        # ----------------------------------------------------
+        # Sanity checks
+        # ----------------------------------------------------
+
+        # Overall number of positives must remain identical.
+        assert np.sum(y) == np.sum(y_original)
+
+        # Positive count must also remain identical within
+        # train / validation / test separately.
+        for split_name in ["train", "val", "test"]:
+
+            node_mask = split_masks[split_name]
+
+            if node_mask is None:
+                continue
+
+            original_positive = np.sum(
+                y_original[node_mask]
+            )
+
+            randomized_positive = np.sum(
+                y[node_mask]
+            )
+
+            assert original_positive == randomized_positive, (
+                f"Positive-label count changed in {split_name}: "
+                f"{original_positive} -> {randomized_positive}"
+            )
+
+        print("Random-label sanity checks passed.")
+        print(
+            "Original positive rate:",
+            float(np.mean(y_original)),
+        )
+        print(
+            "Randomized positive rate:",
+            float(np.mean(y)),
+        )
 
     y_train_all = y[
         split_masks["train"]
@@ -684,6 +812,14 @@ def run_logistic_experiment(
             "permute_masks": permute_masks,
             "permutation_seed": (permutation_seed if permute_masks else -1),
             "permutation_matching": (permutation_matching if permute_masks else "none"),
+
+            # Random-label baseline
+            "randomize_labels": randomize_labels,
+            "random_label_seed": (
+                random_label_seed
+                if randomize_labels
+                else -1
+            ),
         }
 
         if extra_metadata:
@@ -726,7 +862,14 @@ def run_logistic_experiment(
             # Null-baseline information
             "permute_masks": permute_masks,
             "permutation_seed": (permutation_seed if permute_masks else -1),
-            "permutation_matching": (permutation_matching if permute_masks else "none")
+            "permutation_matching": (permutation_matching if permute_masks else "none"),
+
+            "randomize_labels": randomize_labels,
+            "random_label_seed": (
+                random_label_seed
+                if randomize_labels
+                else -1
+            ),
         }
 
         result.update(

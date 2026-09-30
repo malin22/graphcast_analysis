@@ -1,18 +1,3 @@
-"""Publication-ready AR perturbation figures for the GraphCast report.
-
-Produces two core figures:
-  Figure 1: spatial ΔIVT maps for negative/positive perturbations at early,
-            middle, and late lead times, with ClimateNet contours where available.
-  Figure 2: immediate (+6 h) AR-mask dose response plus the absolute global
-            mean IVT trajectories, with gamma=0 shown as the baseline.
-
-Each composite figure is also exported as separate panel PNGs for flexible
-assembly in LaTeX.
-
-The script intentionally keeps the report figures selective. Diagnostic plots,
-videos, precipitation metrics, etc. remain in evaluate_ar.py.
-"""
-
 import os
 import glob
 from contextlib import closing
@@ -21,6 +6,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
 
 from evaluation_helpers import (
     area_weighted_mean,
@@ -36,8 +24,8 @@ from evaluation_helpers import (
 # Configuration
 # -----------------------------------------------------------------------------
 WEATHER_FEATURE = "AR"
-ACTIVATION_TYPE = "raw_activations_new_normalization_no_threshold"
-CENTER_STR = "2021-07-18T00"
+ACTIVATION_TYPE = "raw_activations"
+CENTER_STR = "2021-10-28T00"
 NODE_HIERARCHY_LEVEL = 6
 CONTROL_GAMMA = 0.0
 MAX_MASK_TIME_DIFFERENCE_HOURS = 3
@@ -46,7 +34,7 @@ MAX_MASK_TIME_DIFFERENCE_HOURS = 3
 REPORT_GAMMAS = (-0.5, 0.5)
 
 # Requested representative lead times. The nearest available model step is used.
-MAP_LEAD_HOURS = (24, 72, 120)
+MAP_LEAD_HOURS = (6, 24, 72, 120)
 
 # If None, "outside" means the full forecast domain outside the ClimateNet mask.
 # To use a local analysis box, set e.g. (lon_min, lon_max, lat_min, lat_max).
@@ -64,7 +52,12 @@ BASE_DIR = os.path.join(
     CENTER_STR,
 )
 INPUT_DIR = os.path.join(BASE_DIR, "data")
-OUT_DIR = os.path.join(BASE_DIR, "evaluation", "report_figures")
+OUT_DIR = os.path.join(
+    "plots", "perturbation", WEATHER_FEATURE,
+    f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}",
+    ACTIVATION_TYPE,
+    CENTER_STR, "for_report"
+)
 PANEL_DIR = os.path.join(OUT_DIR, "panels")
 MASK_DIR = f"/share/prj-4d/graphcast_shared/data/ClimateNetLarge/{WEATHER_FEATURE}_labels_cleaned"
 
@@ -317,11 +310,15 @@ def add_mask_contour_if_available(ax, field, valid_time):
         levels=[0.5],
         colors="black",
         linewidths=0.8,
+        transform=ccrs.PlateCarree(),
     )
     return mask_time, diff_h
 
 
-def draw_spatial_panel(ax, ivt_cache, gamma, idx, valid_times, vmax, show_mask=True):
+def draw_spatial_panel(
+    ax, ivt_cache, gamma, idx, valid_times, vmax,
+    show_mask=True, show_xlabels=True, show_ylabels=True,
+):
     control = ivt_cache[CONTROL_GAMMA]
     delta = maybe_subset_domain(ivt_cache[gamma].isel(time=idx) - control.isel(time=idx))
     lat = get_lat_name(delta)
@@ -329,11 +326,43 @@ def draw_spatial_panel(ax, ivt_cache, gamma, idx, valid_times, vmax, show_mask=T
     mesh = ax.pcolormesh(
         delta[lon].values, delta[lat].values, delta.values,
         cmap="RdBu_r", vmin=-vmax, vmax=vmax, shading="auto", rasterized=True,
+        transform=ccrs.PlateCarree(),
     )
     if show_mask:
         add_mask_contour_if_available(ax, delta, valid_times[idx])
-    ax.set_xlabel("Longitude")
-    ax.set_ylabel("Latitude")
+    # Rectangular lon/lat world map, matching the reference style.
+    ax.set_global()
+    ax.coastlines(
+        resolution="110m",
+        linewidth=0.25,
+        color="0.45",
+    )
+
+    #ax.add_feature(cfeature.BORDERS, linewidth=0.30, edgecolor="0.45")
+    # Use real map-axis ticks on every panel, but only print coordinate numbers
+    # on the outer axes. This keeps the shared-axis look while retaining the
+    # small tick marks on all maps.
+    xticks = np.arange(-180, 181, 60)
+    yticks = np.arange(-60, 61, 30)
+    ax.set_xticks(xticks, crs=ccrs.PlateCarree())
+    ax.set_yticks(yticks, crs=ccrs.PlateCarree())
+    ax.xaxis.set_major_formatter(LongitudeFormatter())
+    ax.yaxis.set_major_formatter(LatitudeFormatter())
+    ax.tick_params(
+        axis="both", which="major", direction="out", length=2.5, width=0.6,
+        labelsize=7,
+    )
+    ax.tick_params(axis="x", labelbottom=show_xlabels)
+    ax.tick_params(axis="y", labelleft=show_ylabels)
+
+    # Light gridlines at the same locations as the ticks.
+    ax.gridlines(
+        crs=ccrs.PlateCarree(), draw_labels=False,
+        xlocs=xticks, ylocs=yticks,
+        linewidth=0.30, color="0.65", alpha=0.45, linestyle=":"
+    )
+    ax.set_xlabel("")
+    ax.set_ylabel("")
     return mesh
 
 
@@ -357,25 +386,39 @@ def make_figure1(ivt_cache, valid_times, lead_hours):
         vmax = np.nanmax(np.abs(all_values))
 
     # Composite figure.
+    # Lead times are rows; perturbations are the two columns.
     fig, axes = plt.subplots(
-        2, len(step_indices), figsize=(10.5, 5.2),
-        sharex=True, sharey=True, constrained_layout=True,
+        len(step_indices), 2, figsize=(9.0, 1.95 * len(step_indices)),
+        subplot_kw={"projection": ccrs.PlateCarree()},
+        constrained_layout=False,
     )
+    axes = np.atleast_2d(axes)
     last_mesh = None
-    for r, gamma in enumerate((neg_gamma, pos_gamma)):
-        for c, idx in enumerate(step_indices):
+    for r, idx in enumerate(step_indices):
+        for c, gamma in enumerate((neg_gamma, pos_gamma)):
             ax = axes[r, c]
-            last_mesh = draw_spatial_panel(ax, ivt_cache, gamma, idx, valid_times, vmax)
+            last_mesh = draw_spatial_panel(
+                ax, ivt_cache, gamma, idx, valid_times, vmax,
+                show_xlabels=(r == len(step_indices) - 1),
+                show_ylabels=(c == 0),
+            )
             if r == 0:
-                ax.set_title(f"+{format_lead_time(round(lead_hours[idx]))}")
+                ax.set_title(rf"$\mathbf{{\gamma={gamma:+g}}}$")
             if c == 0:
-                ax.set_ylabel(rf"$\gamma={gamma:+g}$" + "\nLatitude")
-            else:
-                ax.set_ylabel("")
-            if r != 1:
-                ax.set_xlabel("")
+                ax.text(-0.145, 0.5, f"+{format_lead_time(round(lead_hours[idx]))}",
+                        transform=ax.transAxes, rotation=90, va="center", ha="center",
+                        clip_on=False, fontweight="bold")
+            ax.set_xlabel("")
+            ax.set_ylabel("")
 
-    cbar = fig.colorbar(last_mesh, ax=axes, location="right", shrink=0.90, pad=0.02)
+    # Keep the map panels packed tightly, while reserving a slim strip for the
+    # shared colorbar.  This is deliberately tighter than constrained_layout.
+    fig.subplots_adjust(left=0.105, right=0.885, bottom=0.075, top=0.955,
+                        wspace=0.1, hspace=0.015)
+    fig.supxlabel("Longitude",  x=0.42, y=0.015)
+    fig.supylabel("Latitude", x=0.012)
+
+    cbar = fig.colorbar(last_mesh, ax=axes, location="right", shrink=0.94, pad=0.012)
     cbar.set_label(r"$\Delta$IVT [kg m$^{-1}$ s$^{-1}$]")
     stem = os.path.join(OUT_DIR, "figure1_spatial_delta_ivt")
     fig.savefig(stem + ".png", bbox_inches="tight")
@@ -385,7 +428,7 @@ def make_figure1(ivt_cache, valid_times, lead_hours):
     # Standalone panels, all with the same color normalization as the composite.
     for gamma in (neg_gamma, pos_gamma):
         for idx in step_indices:
-            panel_fig, panel_ax = plt.subplots(figsize=(5.0, 3.2), constrained_layout=True)
+            panel_fig, panel_ax = plt.subplots(figsize=(5.0, 3.2), subplot_kw={"projection": ccrs.PlateCarree()}, constrained_layout=True)
             mesh = draw_spatial_panel(panel_ax, ivt_cache, gamma, idx, valid_times, vmax)
             panel_ax.set_title(rf"$\gamma={gamma:+g}$, +{format_lead_time(round(lead_hours[idx]))}")
             cb = panel_fig.colorbar(mesh, ax=panel_ax, pad=0.02)
@@ -403,16 +446,17 @@ def draw_dose_panel(ax, metrics, lead_h, ylims=None, title=None, show_legend=Tru
     group = metrics[np.isclose(metrics["lead_hours"], lead_h)].sort_values("gamma")
     ax.plot(
         group["gamma"], group["delta_ivt_inside_mask_mean"],
-        marker="o", linewidth=2.0, label="Inside AR mask",
+        marker="o", linewidth=2.0, label="Inside AR mask", color="green",#plt.get_cmap("coolwarm")(1.0),
     )
     ax.plot(
         group["gamma"], group["delta_ivt_outside_mask_mean"],
-        marker="s", linewidth=1.8, linestyle="--", label="Outside AR mask",
+        marker="s", linewidth=1.8, linestyle="--", label="Outside AR mask",color="0.5"
     )
     ax.axhline(0, linewidth=0.8, color="0.45")
     ax.axvline(0, linewidth=0.8, color="0.45")
     if ylims is not None:
         ax.set_ylim(*ylims)
+    ax.set_xticks([-1.0, -0.5, -0.2, 0.0, 0.2, 0.5, 1.0])
     ax.set_xlabel(r"Perturbation strength $\gamma$")
     ax.set_ylabel(r"Mean $\Delta$IVT [kg m$^{-1}$ s$^{-1}$]")
     if title:

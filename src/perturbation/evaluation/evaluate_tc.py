@@ -1,5 +1,3 @@
-"""Tropical-cyclone tracking and intensity evaluation."""
-
 import os
 
 import numpy as np
@@ -15,8 +13,8 @@ from evaluation_helpers import (
 )
 
 WEATHER_FEATURE = "TC"
-THRESHOLD = 0.9
-CENTER_STR = "2021-03-10T18"
+THRESHOLD = 0.0
+CENTER_STR = "2021-08-08T00"
 ACTIVATION_TYPE="raw_activations"
 NODE_HIERARCHY_LEVEL = 6
 CONTROL_GAMMA = 0.0

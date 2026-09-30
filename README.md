@@ -1,8 +1,26 @@
-**Towards a Mechanistic Understanding of GraphCast Through Latent Analysis**
+## Towards a Mechanistic Understanding of GraphCast Through Latent Analysis ##
 
 In this repo we provide the code for investigating the internal latent activations of GraphCast using principal component analysis (PCA) applied to the processor-layer embeddings across multi-year global forecasts. By projecting latent activations onto principal component directions, we can construct an unsupervised basis capturing the dominant directions of variation in the latent representation. We use this basis to test how global atmospheric information is organised within the representation and how much of it is retained in progressively lower-dimensional subspaces. We then extend this analysis to extreme-weather phenomena, testing whether such events can be identified from compact subsets of the latent representation of GraphCast. Finally, we move beyond association and decodability by intervening directly on selected latent directions and evaluating whether these interventions produce systematic changes in forecasts of atmospheric rivers (ARs) and tropical cyclones (TCs).
 
-## Repository Structure
+
+### Setup and Installation
+
+Install the required dependencies from `requirements.txt`, for instance, with conda:
+
+```bash
+conda create -n graphcast-analysis python=3.12
+conda activate graphcast-analysis
+pip install -r requirements.txt
+```
+
+The perturbation experiments require access to and intervention on internal processor representations. For this purpose, the GraphCast implementation was extended with additional hooks for latent activation manipulation.
+
+The modifications are based on the GraphCast fork of [MacMillan et al.'s GraphCast interpretability work](https://github.com/theodoremacmillan/graphcast-interpretability), with further changes added for the perturbation experiments in this repository.
+
+The `requirements.txt` contains the modified GraphCast fork.
+
+
+### Repository Structure
 ```text
 graphcast_analysis/
 ├── README.md
@@ -24,13 +42,12 @@ graphcast_analysis/
 │   └── deprecated/                    # Older or unused scripts
 │
 ├── plots/                             # Generated figures
-│   ├── baselines/
+│   ├── regression/
 │   └── ...
 │
-├── results/                           # Generated numerical results
+├── results/                           # Generated numerical results (not pushed!)
 │   └── ...
 │
-├── logs/                              # HPC output and error logs
 ```
 
 ### Data Directory

@@ -10,12 +10,12 @@ from perturbation.run_perturbation import run_perturbation
 # EXPERIMENT CONFIG
 # ============================================================
 
-WEATHER_FEATURE = "AR"
+WEATHER_FEATURE = "TC"
 NODE_HIERARCHY_LEVEL = 6
 
 THRESHOLD = 0.0
 
-START_TIME = "2021-07-18T00"
+START_TIME = "2021-03-10T18"
 
 
 EXPERIMENT_NAME = "permuted_masks_raw_activations"
@@ -36,7 +36,8 @@ PROBE_PATH = (
     / "extreme_weather_events"
     / WEATHER_FEATURE
     / f"Node_Hierarchy_Level_M{NODE_HIERARCHY_LEVEL}"
-    / "raw_activations"
+    / "permuted_masks_raw_activations"
+    / "seed_1"
     / (
         f"probe_direction_{WEATHER_FEATURE}_permuted_masks_raw_activations_"
         f"intersection_M{NODE_HIERARCHY_LEVEL}_512_features_"

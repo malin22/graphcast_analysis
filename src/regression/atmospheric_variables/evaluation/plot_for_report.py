@@ -33,8 +33,8 @@ BASE_PATH = (
 )
 
 OUT_DIR = os.path.join(
-    "plots/regression/"
-    f"{REGRESSION_TYPE}/for_report_new_new"
+    "plots/regression/atmospheric_variables/",
+    f"{REGRESSION_TYPE}/for_report"
 )
 
 os.makedirs(OUT_DIR, exist_ok=True)
@@ -59,8 +59,8 @@ SURFACE_VARIABLES = [
 
 SURFACE_LABELS = {
     "2t": "2m temperature",
-    "10u": "10m zonal wind",
-    "10v": "10m meridional wind",
+    "10u": "10m zonal (u) wind",
+    "10v": "10m meridional (v) wind",
     "msl": "Mean sea-level pressure",
     "tp": "Total precipitation",
 }
@@ -102,8 +102,8 @@ PRESSURE_FILES = {
 PRESSURE_TITLES = {
     "temperature": "Temperature",
     "geopotential": "Geopotential",
-    "v_component_of_wind": "Meridional wind",
-    "u_component_of_wind": "Zonal wind",
+    "v_component_of_wind": "Meridional (v) wind",
+    "u_component_of_wind": "Zonal (u) wind",
     "specific_humidity": "Specific humidity",
     "vertical_velocity": "Vertical velocity",
 }
@@ -132,7 +132,7 @@ PRESSURE_LEVELS_TO_PLOT = [
 # Colors
 # ============================================================
 
-cmap = colormaps["viridis"]
+cmap = colormaps["viridis_r"]
 
 PRESSURE_COLORS = {
     level: cmap(x)

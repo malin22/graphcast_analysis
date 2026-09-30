@@ -15,11 +15,11 @@ NODE_HIERARCHY_LEVEL = 6
 
 N_SELECTED_PCS = 200
 
-THRESHOLD = 0.9
+THRESHOLD = 0.0
 
 EXPERIMENT_NAME = f"selected_top_{N_SELECTED_PCS}_pcs"
 
-START_TIME = "2021-02-12T18"
+START_TIME = "2021-08-08T00"
 
 
 # ============================================================
@@ -313,6 +313,7 @@ def build_intervention() -> PerturbationDirection:
     # 6. PERTURBATION DIRECTION
     # ========================================================
 
+    # Direction in standardized selected-PC space: (200,)
     direction_z = coef_z.copy()
 
     norm_z = np.linalg.norm(direction_z)
@@ -324,13 +325,22 @@ def build_intervention() -> PerturbationDirection:
 
     direction_z /= norm_z
 
+    # Undo standardization: still (200,)
+    direction_pc = scaler_scale * direction_z
+
+    # Map selected-PC direction back to GraphCast activation space: (512,)
     direction = (
-        scaler_scale * direction_z
+        selected_pca_components.T @ direction_pc
     ).astype(np.float32)
+
+    if direction.shape != (512,):
+        raise ValueError(
+            f"Expected 512-D perturbation direction, got {direction.shape}"
+        )
 
     print(
     "Standardized direction norm:",
-    np.linalg.norm(direction / scaler_scale),
+    np.linalg.norm(direction_z),
     )
 
     print(
