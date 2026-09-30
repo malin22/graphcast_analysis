@@ -51,8 +51,9 @@ graphcast_analysis/
 ```
 
 ### Data Directory
+The data/ directory is not included in the repository. It is shown here to document the expected local data layout used by the analysis scripts.
 
-The data directory contains GraphCast latent activations, ERA5 and ocean data, PCA outputs, event labels, and derived datasets used by the analysis scripts.
+It contains GraphCast latent activations, ERA5 and ocean data, PCA outputs, event labels, and derived datasets used by the analysis scripts.
 
 ```text
 data/                                      # Local/shared analysis data
