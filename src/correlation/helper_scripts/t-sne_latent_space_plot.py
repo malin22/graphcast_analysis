@@ -319,7 +319,7 @@ def main():
         type=Path,
         default=Path("/share/prj-4d/graphcast_shared/data/graphcast_activation_2019"),
     )
-    parser.add_argument("--out-dir", type=Path, default=Path("/home/student/s/sascholle/share/graphcast_analysis/plots/sabines_experiments/mapping_experiments/latent_space_tsne"))
+    parser.add_argument("--out-dir", type=Path, default=Path("/plots//mapping_experiments/latent_space_tsne"))
     parser.add_argument("--max-files", type=int, default=4)
     parser.add_argument("--mesh-level", type=int, default=3, choices=range(0, 7))
     parser.add_argument(

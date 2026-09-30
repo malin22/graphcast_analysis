@@ -287,7 +287,7 @@ def main():
     )
     parser.add_argument("--years", type=int, nargs="+", default=[2019, 2020, 2021])
     parser.add_argument("--activation-template", default=DEFAULT_ACTIVATION_TEMPLATE)
-    parser.add_argument("--pc-indices", type=int, nargs="+", default=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    parser.add_argument("--pc-indices", type=int, nargs="+", default=[0, 100, 200, 300, 400, 500])
     parser.add_argument("--max-lag-days", type=int, default=730)
     parser.add_argument("--no-center", action="store_true")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
@@ -379,7 +379,7 @@ def main():
         sim,
         pair_counts,
         pc_indices,
-        args.output_dir / "pc_circular_over_all_years.png",
+        args.output_dir / "pc_circular_over_all_years_control.png",
         cmap_name=args.cmap,
     )
 

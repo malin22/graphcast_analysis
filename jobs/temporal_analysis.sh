@@ -19,7 +19,7 @@ source /home/student/s/sascholle/miniconda3/etc/profile.d/conda.sh
 conda activate graphcast312
 
 # Run your script
-srun python -u src/temporal_pattern_experiments/seasonality_cosine.py
-#srun python -u src/sabines_temporal_pattern_experiments/diurnal_similarity.py
+srun python -u src/temporality/seasonality_cosine.py
+#srun python -u src/temporality/diurnal_similarity.py
 
 echo "Finished at: $(date)"
